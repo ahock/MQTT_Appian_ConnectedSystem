@@ -6,7 +6,7 @@
 
     <groupId>de.hock</groupId>
     <artifactId>mqtt-broker-connected-system</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
     <packaging>jar</packaging>
 
     <name>MQTT Broker Connected System</name>

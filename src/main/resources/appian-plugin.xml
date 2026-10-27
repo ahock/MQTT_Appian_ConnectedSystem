@@ -3,7 +3,7 @@
   Appian plug-in manifest for the MQTT Broker Connected System.
 
   MINIMAL SMOKE-TEST BUILD. Registers the two runtime entry points of the reduced plug-in:
-    * de.hock.mqtt.template.MqttConnectedSystemTemplate - five-field broker configuration
+    * de.hock.mqtt.template.MqttConnectedSystemTemplate - nine-field broker configuration
     * de.hock.mqtt.integration.MqttPublishIntegration   - WRITE integration that publishes one message
 
   The connected-systems-core 1.9.1 descriptor schema registers a connected system as a
@@ -23,7 +23,7 @@
     <plugin-info>
         <description>Minimal smoke-test build of the MQTT connected system: broker configuration plus one integration that publishes a message to a topic.</description>
         <vendor name="Hock" url="https://itondemand.com"/>
-        <version>1.0.4</version>
+        <version>1.0.5</version>
         <application-version min="26.9.0.0"/>
     </plugin-info>
 

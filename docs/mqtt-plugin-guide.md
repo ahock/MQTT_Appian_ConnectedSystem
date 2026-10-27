@@ -1,14 +1,19 @@
 # MQTT Broker Connected System — Plug-in Guide
 
 > **⚠️ This guide describes the pre-reduction FULL build (1.0.x).** The plug-in that currently ships
-> is **1.0.4, a minimal smoke-test build**: one connected system with five fields (`brokerHost`,
-> `brokerPort`, `clientIdentifier`, `username`, `password`) and one publish integration with three
-> inputs (`topic`, `payload`, `qos`). TLS and certificates, the subscribe integration, Last Will and
-> Testament, reconnection tuning, diagnostics and design-time validation are **not present** in
-> 1.0.4. For what actually ships, see [README.md](../README.md). The full source this guide
-> documents is archived at `.backup/mqtt-plugin-FULL-1.0.3-src.zip`. Everything below is retained
-> unchanged because it stays useful to whoever restores that archive — read it as history, not as a
-> description of the current plug-in.
+> is **1.0.5, a minimal build**: one connected system with nine fields (`brokerHost`, `brokerPort`,
+> `clientIdentifier`, `username`, `password`, `connectionTimeoutSeconds`, `keepAliveSeconds`,
+> `cleanSession`, `autoReconnectEnabled`) and one publish integration with three inputs (`topic`,
+> `payload`, `qos`). TLS and certificates, the subscribe integration, Last Will and Testament,
+> reconnect attempt tuning and diagnostics are **not present** in 1.0.5. Design-time validation
+> *is* present, but **ungated** — it runs on every render including the first, deliberately, as a
+> probe for whether Appian displays connected system field errors at all. That directly contradicts
+> the gated behaviour this guide describes below ("A brand-new Connected System opens clean with no
+> validation messages", near line 116), which is history. For what actually ships, see [README.md](../README.md). The full source this guide
+> documents is in git commit `d023a76` and archived at
+> `.backup/mqtt-plugin-FULL-1.0.3-src.zip`. Everything below is retained unchanged because it stays
+> useful to whoever restores that archive — read it as history, not as a description of the current
+> plug-in.
 
 An Appian Connected System plug-in that lets Appian applications publish messages to, and
 collect messages from, an MQTT broker. It packages one **Connected System template** (reusable

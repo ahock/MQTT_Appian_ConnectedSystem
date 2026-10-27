@@ -11,12 +11,15 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
  *
  * <p>Keeping the whole Paho surface in one class is the point of this build. Paho 1.2.5 ships as a
  * nested jar under {@code META-INF/lib/}, which is where Appian's plug-in classloader resolves
- * bundled libraries from — a layout that has never been confirmed on a live instance. If the
- * classloader does not find it, the {@code NoClassDefFoundError} names
- * {@code de.hock.mqtt.MqttPublisher} and nothing else.
+ * bundled libraries from — confirmed by the 1.0.4 deploy on a live 26.9 instance. If the classloader
+ * ever fails to find it, the {@code NoClassDefFoundError} names {@code de.hock.mqtt.MqttPublisher}
+ * and nothing else.
  *
- * <p>There is deliberately no connection cache, no session manager, no reconnection, no background
- * thread and no Last Will. The synchronous {@link MqttClient} is used rather than
+ * <p>Session settings — connect timeout, keep-alive interval, clean session and automatic reconnect
+ * — come from the connected system and are applied in {@link #buildConnectOptions}; a {@code null}
+ * value means "not configured" and takes the default documented there. There is deliberately no
+ * connection cache, no session manager, no background thread and no Last Will. The synchronous
+ * {@link MqttClient} is used rather than
  * {@code MqttAsyncClient} because its blocking API matches Appian's request/response model without
  * token plumbing, and {@link MemoryPersistence} is used because Paho's default persistence writes
  * to the filesystem, which Appian's plug-in policies forbid.
@@ -32,6 +35,18 @@ public final class MqttPublisher {
    * hang an Appian request thread.
    */
   static final int CONNECT_TIMEOUT_SECONDS = 5;
+
+  /** Lowest configured connect timeout accepted at run time; matches the design-time rule. */
+  static final int CONNECT_TIMEOUT_MIN_SECONDS = 1;
+
+  /** Highest configured connect timeout accepted at run time; matches the design-time rule. */
+  static final int CONNECT_TIMEOUT_MAX_SECONDS = 300;
+
+  /** Lowest configured keep-alive interval accepted at run time; {@code 0} disables keep-alive. */
+  static final int KEEP_ALIVE_MIN_SECONDS = 0;
+
+  /** Highest configured keep-alive interval accepted at run time, the MQTT 16-bit ceiling. */
+  static final int KEEP_ALIVE_MAX_SECONDS = 65535;
 
   /** Upper bound in milliseconds on any single blocking Paho call. */
   static final long TIME_TO_WAIT_MILLIS = 10_000L;
@@ -58,6 +73,12 @@ public final class MqttPublisher {
    * @param topic the topic to publish to
    * @param payload the message bytes; {@code null} is sent as an empty payload
    * @param qos requested quality of service, 0, 1 or 2
+   * @param connectionTimeoutSeconds connect timeout; {@code null} or out of range falls back to
+   *     {@value #CONNECT_TIMEOUT_SECONDS} seconds
+   * @param keepAliveSeconds keep-alive interval; {@code null} or out of range leaves Paho's own
+   *     default of 60 seconds in place, and {@code 0} disables keep-alive
+   * @param cleanSession clean-session flag; {@code null} means {@code true}
+   * @param autoReconnectEnabled automatic-reconnect flag; {@code null} means {@code false}
    * @throws MqttException if the connection or the publish fails
    */
   public static void publish(
@@ -68,7 +89,11 @@ public final class MqttPublisher {
       char[] password,
       String topic,
       byte[] payload,
-      int qos)
+      int qos,
+      Integer connectionTimeoutSeconds,
+      Integer keepAliveSeconds,
+      Boolean cleanSession,
+      Boolean autoReconnectEnabled)
       throws MqttException {
 
     String clientId =
@@ -76,14 +101,14 @@ public final class MqttPublisher {
             ? MqttClient.generateClientId()
             : clientIdentifier.trim();
 
-    MqttConnectOptions options = new MqttConnectOptions();
-    options.setConnectionTimeout(CONNECT_TIMEOUT_SECONDS);
-    options.setCleanSession(true);
-    options.setAutomaticReconnect(false);
-    if (username != null && !username.isBlank() && password != null && password.length > 0) {
-      options.setUserName(username);
-      options.setPassword(password);
-    }
+    MqttConnectOptions options =
+        buildConnectOptions(
+            username,
+            password,
+            connectionTimeoutSeconds,
+            keepAliveSeconds,
+            cleanSession,
+            autoReconnectEnabled);
 
     MqttClient client =
         new MqttClient("tcp://" + brokerHost + ":" + brokerPort, clientId, new MemoryPersistence());
@@ -105,5 +130,69 @@ public final class MqttPublisher {
         // Nothing useful can be done about a failed close of a client being discarded.
       }
     }
+  }
+
+  /**
+   * Builds the connect options from the connected system's session settings.
+   *
+   * <p>Separated out so the mapping from configuration to Paho is observable without a broker: every
+   * setter used here has a matching getter on {@link MqttConnectOptions}. The method is total — it
+   * never throws. A {@code null} value means "not configured" and takes the documented default; a
+   * supplied value outside its bounds also falls back to the default rather than failing the
+   * publish, because whether Appian displays the design-time error for it is exactly what release
+   * 1.0.5 is probing, and a mistyped keep-alive is not worth refusing a message over. A blank host
+   * or an out-of-range port still fails, through the integration's run-time guards.
+   *
+   * <p>Effective defaults: connect timeout {@value #CONNECT_TIMEOUT_SECONDS} seconds; keep-alive
+   * Paho's own {@link MqttConnectOptions#KEEP_ALIVE_INTERVAL_DEFAULT} seconds, left in place by not
+   * calling the setter at all; clean session {@code true}; automatic reconnect {@code false}.
+   *
+   * @param username broker user name, or {@code null}/blank for an anonymous connection
+   * @param password broker password; applied only alongside a non-blank username
+   * @param connectionTimeoutSeconds connect timeout in seconds, 1–300, or {@code null}
+   * @param keepAliveSeconds keep-alive interval in seconds, 0–65535, or {@code null}; {@code 0}
+   *     disables MQTT keep-alive
+   * @param cleanSession clean-session flag, or {@code null} for {@code true}
+   * @param autoReconnectEnabled automatic-reconnect flag, or {@code null} for {@code false}. One
+   *     request connects, publishes and disconnects, so this has almost no room to act; it is
+   *     honoured because it is a legitimate Paho setting, and it starts no thread that outlives the
+   *     request — the {@code finally} block in {@link #publish} disconnects and closes the client
+   *     either way.
+   * @return the connect options to hand to Paho
+   */
+  static MqttConnectOptions buildConnectOptions(
+      String username,
+      char[] password,
+      Integer connectionTimeoutSeconds,
+      Integer keepAliveSeconds,
+      Boolean cleanSession,
+      Boolean autoReconnectEnabled) {
+
+    MqttConnectOptions options = new MqttConnectOptions();
+
+    options.setConnectionTimeout(
+        inRange(connectionTimeoutSeconds, CONNECT_TIMEOUT_MIN_SECONDS, CONNECT_TIMEOUT_MAX_SECONDS)
+            ? connectionTimeoutSeconds
+            : CONNECT_TIMEOUT_SECONDS);
+
+    // Not calling the setter is what leaves Paho's own KEEP_ALIVE_INTERVAL_DEFAULT (60) in place.
+    if (inRange(keepAliveSeconds, KEEP_ALIVE_MIN_SECONDS, KEEP_ALIVE_MAX_SECONDS)) {
+      options.setKeepAliveInterval(keepAliveSeconds);
+    }
+
+    options.setCleanSession(cleanSession == null ? true : cleanSession);
+    options.setAutomaticReconnect(autoReconnectEnabled != null && autoReconnectEnabled);
+
+    if (username != null && !username.isBlank() && password != null && password.length > 0) {
+      options.setUserName(username);
+      options.setPassword(password);
+    }
+
+    return options;
+  }
+
+  /** True when {@code value} is supplied and within the inclusive bounds. */
+  private static boolean inRange(Integer value, int min, int max) {
+    return value != null && value >= min && value <= max;
   }
 }

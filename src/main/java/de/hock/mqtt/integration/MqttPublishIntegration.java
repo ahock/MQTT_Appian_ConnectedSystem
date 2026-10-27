@@ -39,10 +39,12 @@ import org.eclipse.paho.client.mqttv3.MqttException;
  * <em>expressionable</em>, which is legal and useful on an integration — and the deliberate
  * opposite of the connected system, where Appian rejects any expressionable descriptor.
  *
- * <p><strong>Execution.</strong> {@code execute} reads the three inputs and the five connected
- * system values, applies four cheap run-time guards that fail before any broker contact, and then
- * calls {@link MqttPublisher#publish}. These guards are <em>not</em> design-time validation: they
- * run at invocation, return an error response, and never touch
+ * <p><strong>Execution.</strong> {@code execute} reads the three inputs and the nine connected
+ * system values — including the four session settings, which are passed straight through to
+ * {@link MqttPublisher#buildConnectOptions} where a {@code null} takes its documented default —
+ * applies four cheap run-time guards that fail before any broker contact, and then calls
+ * {@link MqttPublisher#publish}. These guards are separate from the connected system's design-time
+ * validation: they run at invocation, return an error response, and never touch
  * {@code PropertyState.setErrorAtPath}. They exist because Paho rejects a QoS outside 0–2 with an
  * {@code IllegalArgumentException} and because a blank host yields an opaque URI failure.
  *
@@ -127,6 +129,18 @@ public class MqttPublishIntegration extends SimpleIntegrationTemplate {
         MqttConnectedSystemTemplate.textValue(connection, MqttConnectedSystemTemplate.USERNAME);
     String passwordText =
         MqttConnectedSystemTemplate.textValue(connection, MqttConnectedSystemTemplate.PASSWORD);
+    Integer connectionTimeoutSeconds =
+        MqttConnectedSystemTemplate.integerValue(
+            connection, MqttConnectedSystemTemplate.CONNECTION_TIMEOUT_SECONDS);
+    Integer keepAliveSeconds =
+        MqttConnectedSystemTemplate.integerValue(
+            connection, MqttConnectedSystemTemplate.KEEP_ALIVE_SECONDS);
+    Boolean cleanSession =
+        MqttConnectedSystemTemplate.booleanValue(
+            connection, MqttConnectedSystemTemplate.CLEAN_SESSION);
+    Boolean autoReconnectEnabled =
+        MqttConnectedSystemTemplate.booleanValue(
+            connection, MqttConnectedSystemTemplate.AUTO_RECONNECT_ENABLED);
 
     // Run-time guards, before any broker contact.
     if (topic == null || topic.isBlank()) {
@@ -153,7 +167,18 @@ public class MqttPublishIntegration extends SimpleIntegrationTemplate {
 
     try {
       MqttPublisher.publish(
-          brokerHost, brokerPort, clientIdentifier, username, password, topic, payload, qos);
+          brokerHost,
+          brokerPort,
+          clientIdentifier,
+          username,
+          password,
+          topic,
+          payload,
+          qos,
+          connectionTimeoutSeconds,
+          keepAliveSeconds,
+          cleanSession,
+          autoReconnectEnabled);
     } catch (MqttException | RuntimeException e) {
       return error(
           "MQTT publish failed",

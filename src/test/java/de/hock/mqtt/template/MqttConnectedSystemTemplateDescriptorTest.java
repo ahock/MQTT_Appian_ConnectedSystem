@@ -46,14 +46,18 @@ import org.junit.jupiter.api.Test;
  */
 class MqttConnectedSystemTemplateDescriptorTest {
 
-  /** The five configuration fields the Connected System declares, in descriptor order. */
+  /** The nine configuration fields the Connected System declares, in descriptor order. */
   private static final List<String> CONFIG_FIELD_KEYS =
       List.of(
           MqttConnectedSystemTemplate.BROKER_HOST,
           MqttConnectedSystemTemplate.BROKER_PORT,
           MqttConnectedSystemTemplate.CLIENT_IDENTIFIER,
           MqttConnectedSystemTemplate.USERNAME,
-          MqttConnectedSystemTemplate.PASSWORD);
+          MqttConnectedSystemTemplate.PASSWORD,
+          MqttConnectedSystemTemplate.CONNECTION_TIMEOUT_SECONDS,
+          MqttConnectedSystemTemplate.KEEP_ALIVE_SECONDS,
+          MqttConnectedSystemTemplate.CLEAN_SESSION,
+          MqttConnectedSystemTemplate.AUTO_RECONNECT_ENABLED);
 
   /** The descriptor Appian supplies for a brand-new object: its root state is {@code null}. */
   private static ConfigurationDescriptor emptyDescriptor() {
@@ -117,18 +121,18 @@ class MqttConnectedSystemTemplateDescriptorTest {
   }
 
   /**
-   * Exactly the five expected fields, in order — which pins both "all five present" and "no sixth
+   * Exactly the nine expected fields, in order — which pins both "all nine present" and "no tenth
    * field crept back in".
    */
   @Test
-  void exactlyTheFiveExpectedConfigFieldKeysArePresent() {
+  void exactlyTheNineExpectedConfigFieldKeysArePresent() {
     ConfigurationDescriptor rendered = renderConnectedSystem();
     PropertyState rootState = rendered.getRootState();
 
     assertEquals(
         CONFIG_FIELD_KEYS,
         rootTypeOf(rendered).getPropertyKeys(),
-        "the minimal build declares exactly these five connected system fields, in this order");
+        "this build declares exactly these nine connected system fields, in this order");
     for (String key : CONFIG_FIELD_KEYS) {
       assertNotNull(
           rootState.getPropertyStateAtPath(new PropertyPath(key)),
@@ -161,7 +165,7 @@ class MqttConnectedSystemTemplateDescriptorTest {
       inspected++;
     }
 
-    assertEquals(5, inspected, "all five connected system fields must have been inspected");
+    assertEquals(9, inspected, "all nine connected system fields must have been inspected");
     assertTrue(
         offenders.isEmpty(),
         "Appian rejects a connected system template declaring any expressionable property "
