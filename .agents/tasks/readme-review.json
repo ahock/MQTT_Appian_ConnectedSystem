@@ -1,0 +1,44 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "Cache-key secret claim overstates redaction",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "detail": "README security note says \"Secrets never enter the connection cache key. The session fingerprint used for connection reuse reduces every secret to a presence plus hash token rather than embedding plaintext.\" True for password, client private key, key passphrase, and certificate bytes (hashChars/hashBytes), but username is appended verbatim at src/main/java/de/hock/mqtt/protocol/MqttConnectionManager.java:252, and the README's own diagnostics section counts username among the values Redactor scrubs (src/main/java/de/hock/mqtt/diagnostics/Redactor.java:49-55).",
+      "action": "Narrow the sentence to password/key material, or state that the username appears in plaintext in the in-memory fingerprint."
+    },
+    {
+      "label": "conf.plugins.poll-interval is unbacked by this repository",
+      "severity": "non-blocking",
+      "confidence": "possible",
+      "detail": "The Deploy section documents hot deployment as governed by the conf.plugins.poll-interval custom property, with 0 disabling it. This is an Appian platform property, not a plug-in identifier, and nothing in the project source or the steering file references it, so it could not be verified here.",
+      "action": "Confirm the property name against the Appian 26.9 documentation, or drop the property name and keep the restart caveat."
+    },
+    {
+      "label": "Integration-input expressionability undocumented and asymmetric",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "detail": "The README states expressionability only for the connected system fields, which is accurate. In the integrations, publish qos is isExpressionable(true) (MqttPublishIntegration.java inputProperties) while subscribe qos is not, and subscribe topicFilters/maxWaitSeconds/maxMessageCount are. Nothing in the README is wrong; the asymmetry is simply undocumented.",
+      "action": "Optionally note which integration inputs accept expressions, in particular that subscribe QoS does not."
+    }
+  ],
+  "checks": {
+    "configKeysVerified": 20,
+    "configKeysMissing": 0,
+    "integrationInputsOutputsVerified": 15,
+    "integrationInputsOutputsMissing": 0,
+    "labelsMatchedExactly": 28,
+    "labelMismatches": 0,
+    "errorCategoriesMatched": 8,
+    "errorCategoryMismatches": 0,
+    "quotedErrorMessagesMatchedExactly": 5,
+    "defaultsAndBoundsMismatches": 0,
+    "subscribeSemanticsMatchImplementation": true,
+    "smartServiceClaimed": false,
+    "comAppianMqttReferences": 0,
+    "artifactPathAndVersionFactsCorrect": true,
+    "inventedIdentifiers": 0
+  },
+  "reviewDoc": "/Users/andreas.hock/Documents/Appian-Projects/MQTT_Component/.agents/tasks/readme-review.md"
+}

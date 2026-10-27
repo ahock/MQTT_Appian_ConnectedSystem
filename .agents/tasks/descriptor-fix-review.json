@@ -1,0 +1,42 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "Named deliverable report absent",
+      "blocking": false,
+      "confidence": "confirmed",
+      "detail": "The brief requires .agents/tasks/connected-system-descriptor-fix.md; only connected-system-descriptor-fix-plan.md and connected-system-descriptor-fix-verification.md exist. The required substance, including an honest statement that final confirmation needs a redeploy to 26.9 and opening New > Connected System, is present in those two files (plan sections 5 and 7, verification note section 7). Create the named report or correct the task record to point at the actual paths."
+    },
+    {
+      "label": "Clean Session deploy check covers only one direction",
+      "blocking": false,
+      "confidence": "possible",
+      "detail": "The first-render guard assumes Appian hands back a descriptor derived from the one the template last returned. If the platform supplies only persisted object state, cleanSession reads null on every render, firstRender stays true, and a designer can never turn Clean Session off. The deploy checklist only verifies that an untouched Clean Session persists as enabled, which passes under both platform behaviours. Add the discriminating check: clear the checkbox, save, reopen, confirm still cleared. Update plan section 5 and verification note section 7."
+    },
+    {
+      "label": "New connected system opens with validation errors",
+      "blocking": false,
+      "confidence": "confirmed",
+      "detail": "Generated STRING defaults are empty string and INTEGER defaults are null, and validate() runs unconditionally at the end of getConfiguration, so a brand-new connected system renders with ConfigValidator's 'Broker host is required' and broker-port bounds errors already attached before any input. The new blankBrokerHostIsReportedAgainstItsField test asserts this, so it is deliberate, but the README field reference does not mention it. Decide whether to suppress validation on the first render or document the behaviour."
+    },
+    {
+      "label": "Carried-forward Expression note contradicts the SDK",
+      "blocking": false,
+      "confidence": "confirmed",
+      "detail": "Plan section 3 step 5 and verification note section 7.5 state that a ListTypePropertyDescriptor's generated default is an Expression object so an untouched topicFilters can read back as a one-element list holding an expression's toString(). StateGenerator.getDefaultState only produces an EXPRESSION state when displayHint == EXPRESSION or for a local type below level 1; topicFilters is neither, so generateDefaultValue's isListType branch returns a new empty ArrayList. Leaving readStringList alone was still correct, but the recorded reason is wrong and will mislead a future change to list inputs."
+    },
+    {
+      "label": "Plan section 4 gate block expects a stale import count",
+      "blocking": false,
+      "confidence": "confirmed",
+      "detail": "The copy-pasteable verification block still expects 'grep -rc import com.appian.connectedsystems src/main/java/' to print about 47, unchanged, while the actual and documented figure is 45 (recorded correctly in plan section 7, the verification note and the steering file). Running that block as written now reads as a failure. Update it to 45."
+    },
+    {
+      "label": "Facade mutates a plain HashMap on the template instance",
+      "blocking": false,
+      "confidence": "likely",
+      "detail": "SimpleConfiguration.setPropertiesGeneric does types.put(rootTypeName, freshLocalTypeDescriptor) into ConfigurableTemplate.typePropertyFactory's plain HashMap on every descriptor render, then reads types.values() to feed StateGenerator and withTypes. Appian registers one template instance per plug-in module, so concurrent designers rendering the same form mutate a non-thread-safe map; a resize race could yield a types collection missing the root type the generated state references. Inherent to Appian's documented Simple* facade, nothing to change in plug-in code. Note it for the submission and watch for intermittent design-time errors under concurrent load."
+    }
+  ],
+  "reviewDoc": "/Users/andreas.hock/Documents/Appian-Projects/MQTT_Component/.agents/tasks/descriptor-fix-review.md"
+}

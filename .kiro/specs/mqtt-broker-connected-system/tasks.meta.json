@@ -1,0 +1,442 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Set up Maven Appian plug-in project structure and dependencies": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727602
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319744833
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320484499
+      }
+    ],
+    "2.1 Implement MqttErrorCategory enum": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727665
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320487919
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320646614
+      }
+    ],
+    "2.2 Implement immutable data model records": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727703
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320489186
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320647407
+      }
+    ],
+    "3.1 Implement connection, credential, and session field validators": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727741
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320652558
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355794619
+      }
+    ],
+    "3.2 Implement client identifier auto-generation": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727786
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320653857
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355795582
+      }
+    ],
+    "3.3 Implement LWT and reconnection validators": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727817
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320655261
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355798358
+      }
+    ],
+    "3.4 Implement certificate load validation": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727851
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320656214
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355798435
+      }
+    ],
+    "4.1 Implement publish and subscribe input validators": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727885
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320657261
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355799158
+      }
+    ],
+    "5. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727918
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355812706
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355884974
+      }
+    ],
+    "6.1 Implement MqttConnectOptions mapping from MqttConnectionConfig": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727952
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355900650
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356082479
+      }
+    ],
+    "6.2 Implement MqttSession wrapping Paho MqttAsyncClient": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319727985
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355899494
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356081305
+      }
+    ],
+    "6.3 Implement MqttConnectionManager with session reuse and release": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728019
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356086402
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356269182
+      }
+    ],
+    "7. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728051
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356272873
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356306207
+      }
+    ],
+    "8.1 Implement DiagnosticsBuilder with redaction": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728084
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356311485
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356665265
+      }
+    ],
+    "8.2 Implement OperationResult-to-IntegrationResponse mapping": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728118
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356310702
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356666418
+      }
+    ],
+    "9.1 Implement MqttConnectedSystemTemplate configuration descriptor": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728152
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356670654
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356922903
+      }
+    ],
+    "9.2 Wire design-time validation and config mapping": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728184
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356928378
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791357181358
+      }
+    ],
+    "10.1 Implement MqttPublishIntegration": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728219
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791357185113
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358373913
+      }
+    ],
+    "11.1 Implement MqttSubscribeIntegration with bounded collection": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728252
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791357186306
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358374927
+      }
+    ],
+    "12. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728285
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358379274
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358408926
+      }
+    ],
+    "14.1 Author plug-in descriptors and finalize packaging": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728318
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358412774
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358569715
+      }
+    ],
+    "15. Final checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791319728351
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358573313
+      },
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358637436
+      }
+    ],
+    "2. Implement core data models and the error-category enum": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791320647457
+      }
+    ],
+    "3. Implement configuration validators with property tests": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355798714
+      }
+    ],
+    "4. Implement runtime input validators with property tests": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791355799230
+      }
+    ],
+    "6. Implement connect-options mapping and the Paho session/connection manager": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356269243
+      }
+    ],
+    "8. Implement diagnostics and sensitive-value redaction": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791356666485
+      }
+    ],
+    "9. Implement the Connected System template": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791357181481
+      }
+    ],
+    "10. Implement the Publish integration": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358373972
+      }
+    ],
+    "11. Implement the Subscribe integration": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358374995
+      }
+    ],
+    "14. Package the Appian plug-in": [
+      {
+        "executionId": "bb18dd65-0b91-46aa-a1fe-9a773d020277",
+        "chatSessionId": "sess_5df15ab6-9434-4c51-892d-ad7a02a35f33",
+        "timestamp": 1791358569768
+      }
+    ]
+  }
+}

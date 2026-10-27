@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Appian plug-in manifest for the MQTT Broker Connected System.
+
+  Registers the three runtime entry points of the plug-in:
+    * de.hock.mqtt.template.MqttConnectedSystemTemplate      - the reusable broker configuration surface
+    * de.hock.mqtt.integration.MqttPublishIntegration        - WRITE integration that publishes a message
+    * de.hock.mqtt.integration.MqttSubscribeIntegration      - READ integration that collects messages
+
+  The connected-systems-core 1.9.1 descriptor schema registers a connected system as a
+  <connected-system-template> module whose nested <integration-template> elements declare the
+  integrations bound to that connected system. The key/name/class attributes follow the Appian
+  Connected System Plug-in configuration contract: key is unique within the plug-in (matching the
+  @TemplateId name on each class), name is for documentation/logs, and class is the fully-qualified
+  implementation class.
+
+  The plug-in key must not live under com.appian / com.appiancorp (reserved for Appian's own
+  plug-ins), hence key="de.hock.mqtt".
+
+  All supporting components (MqttConnectionManager, the validators, and the diagnostics builder)
+  are reached through these three registered classes - the integrations construct a
+  MqttConnectionManager and invoke the validators/diagnostics internally, and both integrations
+  reuse MqttConnectedSystemTemplate.toConnectionConfig(...) - so no additional modules are declared.
+-->
+<appian-plugin name="MQTT Broker Connected System" key="de.hock.mqtt">
+    <plugin-info>
+        <description>Connected System plug-in that lets Appian applications publish to and subscribe from an MQTT broker.</description>
+        <vendor name="Hock" url="https://itondemand.com"/>
+        <version>1.0.3</version>
+        <application-version min="26.9.0.0"/>
+    </plugin-info>
+
+    <connected-system-template key="MqttConnectedSystemTemplate"
+            name="MqttConnectedSystemTemplate"
+            class="de.hock.mqtt.template.MqttConnectedSystemTemplate">
+        <integration-template key="MqttPublishIntegration"
+                name="MqttPublishIntegration"
+                class="de.hock.mqtt.integration.MqttPublishIntegration"/>
+        <integration-template key="MqttSubscribeIntegration"
+                name="MqttSubscribeIntegration"
+                class="de.hock.mqtt.integration.MqttSubscribeIntegration"/>
+    </connected-system-template>
+</appian-plugin>

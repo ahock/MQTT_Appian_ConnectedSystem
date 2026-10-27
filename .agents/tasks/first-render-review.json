@@ -1,0 +1,40 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "Immediate-save path uncovered",
+      "severity": "non-blocking",
+      "confidence": "possible",
+      "detail": "Validation is gated on \"first render\", not \"untouched\", so clicking Save on a never-touched new connected system may persist a blank configuration if Appian does not re-render before saving. Design-time UX gap only: the runtime connection would fail and the integrations keep their own InputValidator.",
+      "action": "Add \"open New > Connected System > MQTT Broker and save without touching anything; confirm it is rejected\" to both deploy checklists (connected-system-descriptor-fix.md §8, connected-system-descriptor-fix-plan.md §5, connected-system-descriptor-fix-verification.md §7)."
+    },
+    {
+      "label": "Error-stickiness claim is too broad",
+      "severity": "non-blocking",
+      "confidence": "likely",
+      "detail": "connected-system-descriptor-fix.md §5 states the SDK error-cloning characteristic is \"unreachable from a clean first render\". It is unreachable only on the render-1 to render-2 transition; from render 2 onward errors exist, so a field flagged on render 2 and then filled may still show the stale message on render 3. The passing test only exercises the first transition. The behavior itself is correctly left unfixed as out of scope.",
+      "action": "Narrow the sentence in §5 and add a deploy observation: fix a field flagged on the second render and confirm its message clears."
+    },
+    {
+      "label": "\"or saves\" is an unverified platform claim",
+      "severity": "non-blocking",
+      "confidence": "possible",
+      "detail": "README, the class Javadoc and the records all assert validation fires \"the moment you interact with the form or save it\". The interaction half follows from re-rendering; the save half is an assumption about platform behavior, the same uncertainty as finding 1.",
+      "action": "Either qualify the save half as unverified, or fold it into finding 1's deploy-checklist item."
+    }
+  ],
+  "verifiedAgainstBrief": {
+    "item1_gateOnExistingFirstRenderSignal": "pass — validate() wrapped in if (!firstRender) reusing the single pre-existing signal; priorState/firstRender still captured before setProperties; Clean Session seed and ordering unchanged; no validator class or validate(PropertyState) signature/body changed",
+    "item1_testUpdatedNotDeleted": "pass — blankBrokerHostIsReportedAgainstItsField renamed to blankBrokerHostIsReportedOnEverySubsequentRender, original non-empty-errors assertion kept and moved to the second render; firstRenderOfANewConnectedSystemHasNoValidationErrors and enteringAValueClearsItsErrorWhileOtherFieldsStillReport added; gate-removal negative check recorded as failing exactly those three",
+    "item2a_consolidatedReport": "pass — connected-system-descriptor-fix.md is a standalone nine-section report plus follow-up §10; steering §8 audit trail names real paths",
+    "item2b_expressionTopicFiltersCorrection": "pass — corrected in plan §3 step 5 and verification §7 item 6, both naming shouldRenderAsExpression / DisplayHint.EXPRESSION / local-type-above-level-1 and the isListType -> new ArrayList() branch, both keeping the readStringList-unchanged conclusion and distinguishing isExpressionable(true) from displayHint(EXPRESSION)",
+    "item2c_importCount45": "pass — plan §4 reads 45 in per-file and aggregate form; measured value is 45",
+    "item3_deployChecklists": "pass — discriminating Clean Session check (clear, save, reopen, still cleared) and first-render validation check present in plan §5, verification §7, and report §8; superseded untouched-persists check explicitly labelled as proving nothing",
+    "version": "pass — 1.0.2 in pom.xml and appian-plugin.xml; manifest <version> three-part; <application-version min=\"26.9.0.0\"/>, key=\"de.hock.mqtt\" and vendor Hock untouched; only one jar in target/, named -1.0.2-plugin.jar",
+    "readmeLockstep": "pass — clean-first-render paragraph added, no implication of immediate errors, test-coverage bullet covers both halves, new round-trip limitation bullet; docs/mqtt-plugin-guide.md consistent",
+    "invariants": "pass from recorded evidence — one jar, 33 .java all under de/hock/mqtt/**, bare-root appian-plugin.xml (1), Paho only under META-INF/lib/, 0 connected-systems, 0 com/appian/mqtt, 0 test entries, bytecode major version 61 on all three templates, 28 label keys, three extends Simple* hits, clean code-policy sweep, Tests run: 12 Failures: 0",
+    "scopeCreep": "none — only MqttConnectedSystemTemplate.java, its test, pom.xml, appian-plugin.xml, README.md, docs/mqtt-plugin-guide.md, the steering file and the task records were modified; no validator, no integration, no resources_en_US.properties, none of the five known pre-existing bugs",
+    "spotCheck": "the jar in target/ ships MqttConnectedSystemTemplate.java carrying if (!firstRender) at line 155, confirming the artifact was rebuilt from the restored source rather than the if (true) negative-check variant"
+  },
+  "reviewDoc": "/Users/andreas.hock/Documents/Appian-Projects/MQTT_Component/.agents/tasks/first-render-review.md"
+}

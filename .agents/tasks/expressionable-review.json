@@ -1,0 +1,36 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "Scope expansion beyond the plan",
+      "blocking": false,
+      "confidence": "confirmed",
+      "detail": "Beyond the planned 14 deletions, caCertificate and clientCertificate changed from DocumentPropertyDescriptor uploads to ParagraphPropertyDescriptor pasted-PEM fields and a new PemValidator was added. Justified: DocumentPropertyDescriptorBuilder.<init> sets isExpressionable(true) and checkValidState calls Guard.checkPropertyIsExpressionable, verified independently in connected-systems-core:1.9.1 bytecode, so a document field cannot exist on a connected system template. Recorded as escalated and user-approved in connected-system-descriptor-fix.md §11. It is a breaking migration for any object saved by 1.0.2; no action beyond confirming the escalation record matches what the user agreed to."
+    },
+    {
+      "label": "Contradictory deploy check in §11",
+      "blocking": false,
+      "confidence": "confirmed",
+      "detail": "The §11 deploy checklist asks the deployer to confirm that pasting the PEM 'clears' the non-PEM error on save, while the same document records that validate() never calls clearErrorsAtPath so an attached error survives the next render. Reword to 'reopen the object and confirm no error is reported' so a deployer does not read a known limitation as a failed deploy."
+    },
+    {
+      "label": "PEM shape check is TLS-gated",
+      "blocking": false,
+      "confidence": "confirmed",
+      "detail": "PemValidator runs only when tlsEnabled is true, but toConnectionConfig/resolveCertificateBytes is not gated and returns the UTF-8 bytes of whatever text is stored. An upgraded object with TLS off keeps a silent non-PEM value, and if design-time validation turns out to be ignored on connected systems (open item 7) the only symptom is a CONFIGURATION-category failure on first connect. Acceptable as-is; worth a line in the limitations list."
+    },
+    {
+      "label": "No recorded invariant sweep in the repo",
+      "blocking": false,
+      "confidence": "confirmed",
+      "detail": "The only surviving in-repo evidence is target/surefire-reports (3 + 16 tests, 0 failures) and the built jar; the nine-invariant command output is not recorded in .agents/tasks. I re-ran the read-only jar inspections and all nine pass (one jar, 34 .java entries all under de/hock/mqtt/, bare-root appian-plugin.xml, Paho only under META-INF/lib/, 0 bundled SDK, 0 com/appian/mqtt, 0 test entries, version 1.0.3 with min 26.9.0.0 and Hock vendor, bytecode major 61, 45 SDK imports). Capture the sweep in a verification note so the next reviewer need not re-derive it."
+    },
+    {
+      "label": "Private key field is still single-line encrypted text",
+      "blocking": false,
+      "confidence": "possible",
+      "detail": "The README now presents the three TLS material fields as consistently text-based, but only the two certificate fields are multi-line paragraphs; whether a multi-line PEM private key pastes cleanly into EncryptedTextPropertyDescriptor is unverified. Add it to the deploy checks rather than changing code."
+    }
+  ],
+  "reviewDoc": "/Users/andreas.hock/Documents/Appian-Projects/MQTT_Component/.agents/tasks/expressionable-review.md"
+}

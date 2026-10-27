@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>de.hock</groupId>
+    <artifactId>mqtt-broker-connected-system</artifactId>
+    <version>1.0.3</version>
+    <packaging>jar</packaging>
+
+    <name>MQTT Broker Connected System</name>
+    <description>Appian Connected System plug-in that lets Appian applications publish to and subscribe from an MQTT broker.</description>
+
+    <properties>
+        <!-- Build targets Java 17 (Amazon Corretto 17) per the design. -->
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Dependency versions -->
+        <appian.sdk.version>1.9.1</appian.sdk.version>
+        <appian.sdk.client.version>1.3.0</appian.sdk.client.version>
+        <paho.version>1.2.5</paho.version>
+        <junit.version>5.10.2</junit.version>
+        <jqwik.version>1.8.4</jqwik.version>
+        <moquette.version>0.17</moquette.version>
+
+        <!-- Plugin versions -->
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
+        <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
+        <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
+    </properties>
+
+    <dependencies>
+        <!-- Appian Connected System SDK - core: the configuration/property descriptor types, the
+             PropertyState/ConfigurationDescriptor model, and the @TemplateId /
+             @IntegrationTemplateType annotations. -->
+        <dependency>
+            <groupId>com.appian</groupId>
+            <artifactId>connected-systems-core</artifactId>
+            <version>${appian.sdk.version}</version>
+            <!-- Provided by the Appian runtime at deploy time; not bundled into the plug-in jar. -->
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Appian Connected System SDK - client: the Simple* template facade
+             (SimpleConnectedSystemTemplate, SimpleIntegrationTemplate, SimpleConfiguration) that
+             this plug-in subclasses. The facade owns root-state generation and local-type
+             registration, which the low-level interfaces leave to the implementer. Both Appian
+             artifacts are supplied by the Appian runtime, so both are 'provided' and neither is
+             bundled into the plug-in jar. -->
+        <dependency>
+            <groupId>com.appian</groupId>
+            <artifactId>connected-systems-client</artifactId>
+            <version>${appian.sdk.client.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Eclipse Paho MQTT client -->
+        <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+            <version>${paho.version}</version>
+        </dependency>
+
+        <!-- JUnit 5 (test scope) -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- jqwik property-based testing (test scope) -->
+        <dependency>
+            <groupId>net.jqwik</groupId>
+            <artifactId>jqwik</artifactId>
+            <version>${jqwik.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Embedded MQTT broker for integration tests (test scope) -->
+        <dependency>
+            <groupId>io.moquette</groupId>
+            <artifactId>moquette-broker</artifactId>
+            <version>${moquette.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}-${project.version}</finalName>
+
+        <plugins>
+            <!-- Compile against Java 17 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <release>${maven.compiler.release}</release>
+                </configuration>
+            </plugin>
+
+            <!-- Surefire runs JUnit 5 unit tests and jqwik property tests (*Test / *Properties) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Properties.java</include>
+                    </includes>
+                    <!-- Integration tests are handled by Failsafe, not Surefire. -->
+                    <excludes>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- Failsafe runs integration tests (*IT) against the embedded broker -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven-failsafe-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- The assembly below is the only deployable artifact, so the implicit default-jar
+                 execution is disabled. Two jars both carrying appian-plugin.xml at their root let
+                 an operator deploy the wrong one. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven-jar-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>default-jar</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Packages the Appian plug-in: a jar containing the plug-in descriptor, the plug-in's
+                 own sources (AppMarket policy) plus bundled runtime dependencies (Paho) so the
+                 artifact deploys end-to-end. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>${maven-assembly-plugin.version}</version>
+                <configuration>
+                    <descriptors>
+                        <descriptor>src/assembly/plugin-assembly.xml</descriptor>
+                    </descriptors>
+                    <archive>
+                        <!-- Appian plug-ins have no use for META-INF/maven/** build metadata. -->
+                        <addMavenDescriptor>false</addMavenDescriptor>
+                    </archive>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>build-appian-plugin</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

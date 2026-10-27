@@ -1,0 +1,13 @@
+# Maven build output
+target/
+
+# jqwik run database
+.jqwik-database
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store

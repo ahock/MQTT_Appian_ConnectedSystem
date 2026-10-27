@@ -1,0 +1,7 @@
+{
+  "task_id": "task-appmarket-compliance",
+  "task_description": "Make the Appian MQTT connected system plug-in AppMarket-compliant for Appian 26.9: rename the reserved root package com.appian.mqtt to de.hock.mqtt everywhere, fix the plug-in manifest (key, vendor, application-version min 26.9.0.0, new class FQNs), and fix the packaging so the shipped assembly jar contains its own .java sources beside the .class files plus Paho under META-INF/lib, then sweep for Appian plug-in policy violations and fix the invalidated docs.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}
