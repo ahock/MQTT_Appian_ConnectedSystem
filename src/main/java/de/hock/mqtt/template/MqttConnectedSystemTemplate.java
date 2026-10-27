@@ -11,17 +11,16 @@ import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyD
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyPath;
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyState;
 import com.appian.connectedsystems.templateframework.sdk.configuration.TextPropertyDescriptor;
-import de.hock.mqtt.validation.ConfigValidator;
 
 /**
  * Connected System template declaring the broker configuration of the minimal smoke-test build.
  *
  * <p>This is the design-time configuration surface a Designer fills in once on an <em>MQTT
- * Broker</em> Connected System object; the publish integration then reuses it. The build declares
- * nine fields — broker host, broker port, client identifier, username, password, connection
- * timeout, keep-alive interval, clean session and automatic reconnect — every one of which reaches
- * Paho at run time. TLS, Last Will and Testament and the subscribe integration are not present; the
- * full 1.0.3 surface is preserved in git commit {@code d023a76}.
+ * Broker</em> Connected System object; both the publish and the subscribe integration then reuse
+ * it. The build declares nine fields — broker host, broker port, client identifier, username,
+ * password, connection timeout, keep-alive interval, clean session and automatic reconnect — every
+ * one of which reaches Paho at run time. TLS and Last Will and Testament are not present; the full
+ * 1.0.3 surface is preserved in git commit {@code d023a76}.
  *
  * <p><strong>SDK shape.</strong> The class extends {@link SimpleConnectedSystemTemplate} from
  * {@code com.appian:connected-systems-client} and declares its fields in
@@ -40,7 +39,8 @@ import de.hock.mqtt.validation.ConfigValidator;
  * therefore never touches the expressionable modifier at all — the base builder already seeds the
  * flag {@code false}, and the absence of that builder call in this file is itself a checked
  * invariant. The restriction is specific to connected systems: integration inputs may be
- * expressionable, and the publish integration's three inputs deliberately are.
+ * expressionable, and the publish integration's three inputs and the subscribe integration's four
+ * deliberately are.
  *
  * <p>A second trap follows from the same rule: some SDK descriptor builders set the flag
  * themselves and refuse to build without it. {@code DocumentPropertyDescriptor} and
@@ -51,17 +51,16 @@ import de.hock.mqtt.validation.ConfigValidator;
  * {@link BooleanPropertyDescriptor} and {@link EncryptedTextPropertyDescriptor} are used below;
  * each of those base builders seeds the modifier {@code false} and none forces it on.
  *
- * <p><strong>Design-time validation runs on every render, including the first — deliberately.</strong>
- * {@link #getConfiguration} declares the nine properties and then hands the generated root state to
- * {@link ConfigValidator}, with no first-render gate, no freshness signal and no seeded values. A
- * brand-new connected system therefore opens with errors already showing on Broker Host and Broker
- * Port. That is the point of release 1.0.5: the 26.9 restrictions page says {@code setErrors} is
- * ignored on a connected system, but this plug-in attaches errors through
- * {@code PropertyState.setErrorAtPath}, a different method, so only observation can settle whether
- * field errors display at all — and a gate would make a clean first page ambiguous between "the gate
- * worked" and "Appian discards our errors". See {@link ConfigValidator} for the full rationale and
- * the clear-then-attach contract. The publish integration still re-checks host, port, topic and QoS
- * at run time before it contacts a broker.
+ * <p><strong>There is no design-time validation here, and there must not be.</strong> Release 1.0.5
+ * ran one deliberately ungated, as a probe: the 26.9 restrictions page says {@code setErrors} is
+ * ignored on a connected system, but this plug-in attached errors through
+ * {@code PropertyState.setErrorAtPath}, a different method, so only observation could settle whether
+ * field errors display at all. Observed on a live Appian 26.9 instance: <em>they do not</em>. The
+ * page renders normally and the messages are discarded, so the restriction covers
+ * {@code setErrorAtPath} as well. 1.0.6 therefore removed the clear-and-attach machinery entirely
+ * and moved the same rules to invocation time in {@link de.hock.mqtt.ConnectionConfigValidator},
+ * which both integrations call before they contact a broker. {@code isRequired} below is the only
+ * design-time guard Appian honours; a brand-new connected system now opens clean.
  *
  * <p>The {@code password} field is an {@link EncryptedTextPropertyDescriptor} with
  * {@code masked(true)}, so the platform stores it encrypted and does not render it back after save.
@@ -97,17 +96,17 @@ public class MqttConnectedSystemTemplate extends SimpleConnectedSystemTemplate {
   public static final String AUTO_RECONNECT_ENABLED = "autoReconnectEnabled";
 
   /**
-   * Declares the nine configuration fields and validates them.
+   * Declares the nine configuration fields.
    *
    * <p>{@link SimpleConfiguration#setProperties(PropertyDescriptor...)} builds the root local type,
    * registers it in the descriptor's type map, and generates the root {@link PropertyState} from it
    * — including on the very first render, where Appian hands in a descriptor whose root state is
-   * {@code null}. Validation runs afterwards, because the SDK attaches an error only to a path that
-   * already resolves to a generated nested state.
+   * {@code null}. Nothing else happens here: declaring the properties is the whole design-time
+   * contract now that attached field errors are known to be discarded.
    *
    * @param configuration the configuration wrapper for the (possibly empty) incoming descriptor
    * @param executionContext the design-time execution context, unused
-   * @return the same configuration with the nine properties declared and validated
+   * @return the same configuration with the nine properties declared
    */
   @Override
   protected SimpleConfiguration getConfiguration(
@@ -182,8 +181,6 @@ public class MqttConnectedSystemTemplate extends SimpleConnectedSystemTemplate {
                     + " act.")
             .isRequired(false)
             .build());
-
-    ConfigValidator.validate(configuration.toConfiguration().getRootState());
 
     return configuration;
   }

@@ -6,11 +6,11 @@
 
     <groupId>de.hock</groupId>
     <artifactId>mqtt-broker-connected-system</artifactId>
-    <version>1.0.5</version>
+    <version>1.0.6</version>
     <packaging>jar</packaging>
 
     <name>MQTT Broker Connected System</name>
-    <description>Minimal smoke-test build of the Appian MQTT Connected System plug-in: broker configuration plus one integration that publishes a message to a topic.</description>
+    <description>Appian MQTT Connected System plug-in: broker configuration plus two integrations, one that publishes a message to a topic and one that collects messages from a topic filter.</description>
 
     <properties>
         <!-- Build targets Java 17 (Amazon Corretto 17) per the design. -->
@@ -85,8 +85,8 @@
                 </configuration>
             </plugin>
 
-            <!-- Surefire runs the JUnit 5 unit tests. Its default **/*Test.java include covers both
-                 test classes, so no extra configuration is needed. -->
+            <!-- Surefire runs the JUnit 5 unit tests. Its default **/*Test.java include covers all
+                 seven test classes, so no extra configuration is needed. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

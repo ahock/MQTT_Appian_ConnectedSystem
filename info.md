@@ -1,24 +1,31 @@
 # MQTT Broker Connected System
 
-An Appian Connected System plug-in for publishing messages to an MQTT broker.
+An Appian Connected System plug-in for publishing messages to, and collecting messages from, an MQTT
+broker.
 
 - **Plug-in key:** `de.hock.mqtt`
 - **Vendor:** Hock
-- **Version:** 1.0.4
+- **Version:** 1.0.6
 - **Minimum Appian version:** 26.9.0.0
 
-**Minimal smoke-test build.** This release validates four things only: that the plug-in installs on
-Appian 26.9, that the bundled Eclipse Paho library loads at run time, that the Connected System
-configuration page renders, and that one integration can publish to a broker. TLS, the subscribe
-integration, Last Will and Testament, reconnection tuning, diagnostics and design-time validation
-were deliberately removed; see `README.md`.
+**Built up from a proven baseline.** 1.0.4 validated that the plug-in installs on Appian 26.9, that
+the bundled Eclipse Paho library loads at run time, that the Connected System configuration page
+renders, and that one integration can publish to a broker. 1.0.5 added four session settings. 1.0.6
+adds the subscribe integration. Configuration is validated at run time, inside the integrations,
+because Appian discards design-time errors attached to a connected system. TLS, Last Will and
+Testament, multi-topic subscribe, reconnection tuning and diagnostics remain deliberately absent;
+see `README.md`.
 
 ## Contents
 
-- **Connected System — MQTT Broker:** broker host, port, client identifier, and optional username
-  and password.
+- **Connected System — MQTT Broker:** broker host, port, client identifier, optional username and
+  password, and four session settings (connection timeout, keep-alive interval, clean session,
+  automatic reconnect).
 - **Integration — Publish MQTT Message** (`WRITE` request policy): publishes a single message to a
   topic at a chosen QoS.
+- **Integration — Subscribe to MQTT Topics** (`READ` request policy): collects messages from one
+  topic filter, returning as soon as the message count is reached or the wait elapses. An empty
+  result is a success.
 
 ## Third-party software
 

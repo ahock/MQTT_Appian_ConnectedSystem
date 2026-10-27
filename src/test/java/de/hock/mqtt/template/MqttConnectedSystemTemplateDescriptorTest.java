@@ -15,6 +15,7 @@ import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyP
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyState;
 import com.appian.connectedsystems.templateframework.sdk.configuration.RefreshPolicy;
 import de.hock.mqtt.integration.MqttPublishIntegration;
+import de.hock.mqtt.integration.MqttSubscribeIntegration;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,12 @@ class MqttConnectedSystemTemplateDescriptorTest {
 
   private static ConfigurationDescriptor renderPublish() {
     return new MqttPublishIntegration()
+        .getConfigurationDescriptor(
+            emptyDescriptor(), emptyDescriptor(), new PropertyPath(), null);
+  }
+
+  private static ConfigurationDescriptor renderSubscribe() {
+    return new MqttSubscribeIntegration()
         .getConfigurationDescriptor(
             emptyDescriptor(), emptyDescriptor(), new PropertyPath(), null);
   }
@@ -232,6 +239,58 @@ class MqttConnectedSystemTemplateDescriptorTest {
     for (String key : rootType.getPropertyKeys()) {
       assertTrue(
           expressionable(rootType, key), "publish input " + key + " must stay expressionable");
+    }
+  }
+
+  /**
+   * The subscribe integration, added at 1.0.6, renders its own root state and exactly its four
+   * inputs in display order — and all four stay expressionable, the same deliberate asymmetry with
+   * the connected system that the publish test pins.
+   */
+  @Test
+  void subscribeIntegrationRendersItsRootStateAndItsFourExpressionableInputs() {
+    ConfigurationDescriptor rendered = renderSubscribe();
+
+    assertNotNull(rendered.getRootState(), "subscribe integration root state");
+    LocalTypeDescriptor rootType = rootTypeOf(rendered);
+    assertEquals(
+        List.of(
+            MqttSubscribeIntegration.INPUT_TOPIC_FILTER,
+            MqttSubscribeIntegration.INPUT_QOS,
+            MqttSubscribeIntegration.INPUT_MAX_WAIT_SECONDS,
+            MqttSubscribeIntegration.INPUT_MAX_MESSAGE_COUNT),
+        rootType.getPropertyKeys(),
+        "subscribe inputs, in display order");
+
+    for (String key : rootType.getPropertyKeys()) {
+      assertTrue(
+          expressionable(rootType, key), "subscribe input " + key + " must stay expressionable");
+    }
+  }
+
+  /**
+   * The subscribe inputs avoid the descriptor types whose builders force the expressionable flag on.
+   *
+   * <p>This is a <strong>precaution, not a known platform rule</strong>. The validator that rejected
+   * forced-flag descriptors was {@code ConnectedSystemPropertiesValidator}, which is
+   * connected-system-specific, so a {@code ListTypePropertyDescriptor} is very probably legal on an
+   * integration input. It has simply never been observed on a real instance, and no platform-side
+   * integration-input validator ships in either SDK jar, so it cannot be proven offline. Three
+   * deploy cycles were already lost to descriptor-contract surprises; {@code topicFilter} is
+   * therefore a single text filter with wildcard support, and multi-topic is a deliberate follow-up.
+   */
+  @Test
+  void subscribeInputsUseNoListDocumentOrAppianValueDescriptor() {
+    for (PropertyDescriptor<?> descriptor : rootTypeOf(renderSubscribe()).getProperties()) {
+      assertFalse(
+          descriptor instanceof ListTypePropertyDescriptor,
+          "subscribe input " + descriptor.getKey() + " must not be LIST type");
+      assertFalse(
+          descriptor instanceof DocumentPropertyDescriptor,
+          "subscribe input " + descriptor.getKey() + " must not be a document field");
+      assertFalse(
+          descriptor instanceof AppianValuePropertyDescriptor,
+          "subscribe input " + descriptor.getKey() + " must not be an Appian-value field");
     }
   }
 }

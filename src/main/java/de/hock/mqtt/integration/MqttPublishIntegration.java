@@ -12,6 +12,7 @@ import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyS
 import com.appian.connectedsystems.templateframework.sdk.configuration.TextPropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.metadata.IntegrationTemplateRequestPolicy;
 import com.appian.connectedsystems.templateframework.sdk.metadata.IntegrationTemplateType;
+import de.hock.mqtt.ConnectionConfigValidator;
 import de.hock.mqtt.MqttPublisher;
 import de.hock.mqtt.template.MqttConnectedSystemTemplate;
 import java.nio.charset.StandardCharsets;
@@ -20,13 +21,14 @@ import java.util.Map;
 import org.eclipse.paho.client.mqttv3.MqttException;
 
 /**
- * The one integration of the minimal smoke-test build: publishes a single message to a topic on the
- * broker configured by the {@link MqttConnectedSystemTemplate} Connected System.
+ * Publishes a single message to a topic on the broker configured by the
+ * {@link MqttConnectedSystemTemplate} Connected System.
  *
- * <p>This is requirement (4) of the reduction — proof that a real message reaches a real broker
- * through the bundled Paho library. The subscribe integration, retained publishing, the error
- * category taxonomy and the diagnostics/redaction layer are all gone; the full 1.0.3 surface is
- * preserved in git commit {@code d023a76}.
+ * <p>This was the one integration of the minimal smoke-test build — proof that a real message
+ * reaches a real broker through the bundled Paho library — and it is the module 1.0.6 must not
+ * regress. {@link MqttSubscribeIntegration} joins it as the second integration module. Retained
+ * publishing, the error category taxonomy and the diagnostics/redaction layer are still gone; the
+ * full 1.0.3 surface is preserved in git commit {@code d023a76}.
  *
  * <p><strong>SDK shape.</strong> Extends {@link SimpleIntegrationTemplate} from
  * {@code com.appian:connected-systems-client}, the same simplified facade the Connected System
@@ -42,18 +44,20 @@ import org.eclipse.paho.client.mqttv3.MqttException;
  * <p><strong>Execution.</strong> {@code execute} reads the three inputs and the nine connected
  * system values — including the four session settings, which are passed straight through to
  * {@link MqttPublisher#buildConnectOptions} where a {@code null} takes its documented default —
- * applies four cheap run-time guards that fail before any broker contact, and then calls
- * {@link MqttPublisher#publish}. These guards are separate from the connected system's design-time
- * validation: they run at invocation, return an error response, and never touch
- * {@code PropertyState.setErrorAtPath}. They exist because Paho rejects a QoS outside 0–2 with an
- * {@code IllegalArgumentException} and because a blank host yields an opaque URI failure.
+ * applies three cheap run-time guards that fail before any broker contact, and then calls
+ * {@link MqttPublisher#publish}. The guards are, in order: a blank {@code topic}; the shared
+ * configuration check {@link ConnectionConfigValidator#firstError}; and a QoS outside 0–2. They run
+ * at invocation and return an error response; nothing here touches
+ * {@code PropertyState.setErrorAtPath}, which Appian is now known to ignore on a connected system.
+ * They exist because Paho rejects a QoS outside 0–2 with an {@code IllegalArgumentException} and
+ * because a blank host yields an opaque URI failure.
  *
  * <p>Success returns a flat map — {@code success}, {@code status}, {@code topic}, {@code qos} —
  * where {@code status} is {@code delivered} for QoS 1 or 2 (the broker acknowledged) and
  * {@code dispatched} for QoS 0 (handed off without acknowledgment). Failure returns an
- * {@link IntegrationError} titled {@code Invalid input} or {@code MQTT publish failed} with the
- * underlying message, truncated. Nothing secret is placed in a response: the password is never read
- * into a message.
+ * {@link IntegrationError} titled {@code Invalid input}, {@code Invalid configuration} or
+ * {@code MQTT publish failed} with the underlying message, truncated. Nothing secret is placed in a
+ * response: the password is never read into a message.
  */
 @TemplateId(name = "MqttPublishIntegration")
 @IntegrationTemplateType(IntegrationTemplateRequestPolicy.WRITE)
@@ -146,16 +150,9 @@ public class MqttPublishIntegration extends SimpleIntegrationTemplate {
     if (topic == null || topic.isBlank()) {
       return error("Invalid input", "Topic is required.");
     }
-    if (brokerHost == null || brokerHost.isBlank()) {
-      return error(
-          "Invalid input", "Broker host is required on the MQTT Broker connected system.");
-    }
-    if (brokerPort < 1 || brokerPort > 65535) {
-      return error(
-          "Invalid input",
-          "Broker port must be between 1 and 65535 on the MQTT Broker connected system, but was "
-              + brokerPort
-              + ".");
+    String configError = ConnectionConfigValidator.firstError(connection);
+    if (configError != null) {
+      return error("Invalid configuration", configError);
     }
     if (qos < 0 || qos > 2) {
       return error("Invalid input", "QoS must be 0, 1 or 2, but was " + qos + ".");

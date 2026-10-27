@@ -6,14 +6,14 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 /**
- * The single Eclipse Paho call site of the minimal smoke-test build: connect, publish, disconnect,
- * once per request.
+ * One of the plug-in's two Eclipse Paho call sites: connect, publish, disconnect, once per request.
  *
- * <p>Keeping the whole Paho surface in one class is the point of this build. Paho 1.2.5 ships as a
- * nested jar under {@code META-INF/lib/}, which is where Appian's plug-in classloader resolves
- * bundled libraries from — confirmed by the 1.0.4 deploy on a live 26.9 instance. If the classloader
- * ever fails to find it, the {@code NoClassDefFoundError} names {@code de.hock.mqtt.MqttPublisher}
- * and nothing else.
+ * <p>Paho 1.2.5 ships as a nested jar under {@code META-INF/lib/}, which is where Appian's plug-in
+ * classloader resolves bundled libraries from — confirmed by the 1.0.4 deploy on a live 26.9
+ * instance. The Paho surface stays confined to this class and {@link MqttSubscriber}, so a
+ * classloading failure names one of those two and nothing else. {@link #buildConnectOptions} is
+ * shared with the subscriber, which is why it is package-private rather than private: the
+ * connected system's session settings are mapped to Paho in exactly one place.
  *
  * <p>Session settings — connect timeout, keep-alive interval, clean session and automatic reconnect
  * — come from the connected system and are applied in {@link #buildConnectOptions}; a {@code null}
@@ -135,13 +135,18 @@ public final class MqttPublisher {
   /**
    * Builds the connect options from the connected system's session settings.
    *
-   * <p>Separated out so the mapping from configuration to Paho is observable without a broker: every
-   * setter used here has a matching getter on {@link MqttConnectOptions}. The method is total — it
-   * never throws. A {@code null} value means "not configured" and takes the documented default; a
-   * supplied value outside its bounds also falls back to the default rather than failing the
-   * publish, because whether Appian displays the design-time error for it is exactly what release
-   * 1.0.5 is probing, and a mistyped keep-alive is not worth refusing a message over. A blank host
-   * or an out-of-range port still fails, through the integration's run-time guards.
+   * <p>Separated out so the mapping from configuration to Paho is observable without a broker, and
+   * shared with {@link MqttSubscriber} so neither call site duplicates the default-from-{@code null}
+   * logic: every setter used here has a matching getter on {@link MqttConnectOptions}. The method is
+   * total — it never throws. A {@code null} value means "not configured" and takes the documented
+   * default; a supplied value outside its bounds also falls back to the default rather than throwing
+   * here.
+   *
+   * <p>Since 1.0.6 those out-of-range fallbacks are unreachable on the integration path:
+   * {@link ConnectionConfigValidator#firstError} rejects an out-of-range
+   * {@code connectionTimeoutSeconds} or {@code keepAliveSeconds} before either integration reaches
+   * this method. They are kept as defence in depth, so this method stays a total function for any
+   * caller.
    *
    * <p>Effective defaults: connect timeout {@value #CONNECT_TIMEOUT_SECONDS} seconds; keep-alive
    * Paho's own {@link MqttConnectOptions#KEEP_ALIVE_INTERVAL_DEFAULT} seconds, left in place by not

@@ -2,9 +2,11 @@
 <!--
   Appian plug-in manifest for the MQTT Broker Connected System.
 
-  MINIMAL SMOKE-TEST BUILD. Registers the two runtime entry points of the reduced plug-in:
-    * de.hock.mqtt.template.MqttConnectedSystemTemplate - nine-field broker configuration
-    * de.hock.mqtt.integration.MqttPublishIntegration   - WRITE integration that publishes one message
+  Registers the three runtime entry points of the plug-in:
+    * de.hock.mqtt.template.MqttConnectedSystemTemplate  - nine-field broker configuration
+    * de.hock.mqtt.integration.MqttPublishIntegration    - WRITE integration, publishes one message
+    * de.hock.mqtt.integration.MqttSubscribeIntegration  - READ integration, collects messages from
+                                                           one topic filter within bounded limits
 
   The connected-systems-core 1.9.1 descriptor schema registers a connected system as a
   <connected-system-template> module whose nested <integration-template> elements declare the
@@ -12,18 +14,19 @@
   @TemplateId name on each class, name is for documentation/logs, and class is the fully-qualified
   implementation class.
 
-  The keys are unchanged from 1.0.3 so this build replaces the installed plug-in rather than
-  installing alongside it. <plugin-info><version> is three-part x.y.z (the AppMarket validator
-  rejects four-part); <application-version min=...> is the four-part Appian platform version.
+  The connected system key and the publish key are unchanged from 1.0.3 so this build replaces the
+  installed plug-in rather than installing alongside it; MqttSubscribeIntegration reuses the 1.0.3
+  key as well. <plugin-info><version> is three-part x.y.z (the AppMarket validator rejects
+  four-part); <application-version min=...> is the four-part Appian platform version.
 
   The plug-in key must not live under com.appian / com.appiancorp (reserved for Appian's own
   plug-ins), which is why the key attribute below is in the de.hock namespace.
 -->
 <appian-plugin name="MQTT Broker Connected System" key="de.hock.mqtt">
     <plugin-info>
-        <description>Minimal smoke-test build of the MQTT connected system: broker configuration plus one integration that publishes a message to a topic.</description>
+        <description>MQTT connected system: broker configuration plus two integrations, one that publishes a message to a topic and one that collects messages from a topic filter.</description>
         <vendor name="Hock" url="https://itondemand.com"/>
-        <version>1.0.5</version>
+        <version>1.0.6</version>
         <application-version min="26.9.0.0"/>
     </plugin-info>
 
@@ -33,5 +36,8 @@
         <integration-template key="MqttPublishIntegration"
                 name="MqttPublishIntegration"
                 class="de.hock.mqtt.integration.MqttPublishIntegration"/>
+        <integration-template key="MqttSubscribeIntegration"
+                name="MqttSubscribeIntegration"
+                class="de.hock.mqtt.integration.MqttSubscribeIntegration"/>
     </connected-system-template>
 </appian-plugin>

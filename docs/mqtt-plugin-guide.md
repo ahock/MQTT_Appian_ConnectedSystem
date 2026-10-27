@@ -1,19 +1,22 @@
 # MQTT Broker Connected System — Plug-in Guide
 
 > **⚠️ This guide describes the pre-reduction FULL build (1.0.x).** The plug-in that currently ships
-> is **1.0.5, a minimal build**: one connected system with nine fields (`brokerHost`, `brokerPort`,
+> is **1.0.6**: one connected system with nine fields (`brokerHost`, `brokerPort`,
 > `clientIdentifier`, `username`, `password`, `connectionTimeoutSeconds`, `keepAliveSeconds`,
-> `cleanSession`, `autoReconnectEnabled`) and one publish integration with three inputs (`topic`,
-> `payload`, `qos`). TLS and certificates, the subscribe integration, Last Will and Testament,
-> reconnect attempt tuning and diagnostics are **not present** in 1.0.5. Design-time validation
-> *is* present, but **ungated** — it runs on every render including the first, deliberately, as a
-> probe for whether Appian displays connected system field errors at all. That directly contradicts
-> the gated behaviour this guide describes below ("A brand-new Connected System opens clean with no
-> validation messages", near line 116), which is history. For what actually ships, see [README.md](../README.md). The full source this guide
-> documents is in git commit `d023a76` and archived at
-> git commit `d023a76`. Everything below is retained unchanged because it stays
-> useful to whoever restores that archive — read it as history, not as a description of the current
-> plug-in.
+> `cleanSession`, `autoReconnectEnabled`), one publish integration with three inputs (`topic`,
+> `payload`, `qos`) and one subscribe integration with four (`topicFilter`, `qos`,
+> `maxWaitSeconds`, `maxMessageCount`). Subscribe **does** ship again as of 1.0.6, but in a narrower
+> shape than described below — see the note under [Subscribe to MQTT Topics](#subscribe-to-mqtt-topics).
+> TLS and certificates, Last Will and Testament, reconnect attempt tuning and diagnostics are **not
+> present**. Design-time validation is **gone**: 1.0.5 ran it ungated as a probe and the answer,
+> observed on a live instance, was that Appian discards connected system field errors, so 1.0.6
+> moved those rules to run time inside the integrations. Both the gated behaviour this guide
+> describes below ("A brand-new Connected System opens clean with no validation messages", near line
+> 116) and 1.0.5's ungated probe are history — a brand-new Connected System does open clean in
+> 1.0.6, but because nothing is attached at all. For what actually ships, see
+> [README.md](../README.md). The full source this guide documents is in git commit `d023a76`.
+> Everything below is retained unchanged because it stays useful to whoever restores that archive —
+> read it as history, not as a description of the current plug-in.
 
 An Appian Connected System plug-in that lets Appian applications publish messages to, and
 collect messages from, an MQTT broker. It packages one **Connected System template** (reusable
@@ -142,6 +145,18 @@ Result data includes: `status`, `topic`, `qos`.
 ---
 
 ## Subscribe to MQTT Topics
+
+> **⚠️ 1.0.6 differences.** Subscribe ships again, but its input surface is narrower than the table
+> below, which describes the archived full build. Three differences:
+> 1. **One `topicFilter` (Text), not a `topicFilters` list.** Wildcards cover the common cases:
+>    `sensors/+/temp`, `home/#`. Multi-topic is a deliberate follow-up.
+> 2. **`maxWaitSeconds` is 1–30, not 1–300** — a subscribe blocks an Appian request thread for the
+>    whole wait, and Appian's own integration timeout may fire sooner.
+> 3. **`maxMessageCount` is 1–100, not 1–1000.**
+>
+> `qos` is an optional Integer defaulting to 0, not a required Choice, and all four inputs are
+> optional-with-defaults except `topicFilter`. Out-of-range values are rejected, not clamped. See
+> [README.md](../README.md#using-the-subscribe-integration) for the shipping contract.
 
 Create an **Integration** object bound to the MQTT Broker Connected System and choose **Subscribe
 to MQTT Topics**.
