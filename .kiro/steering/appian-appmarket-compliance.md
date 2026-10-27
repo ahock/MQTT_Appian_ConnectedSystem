@@ -409,9 +409,10 @@ Then deploy to a real 26.9 instance before claiming compatibility: copy the JAR 
 **Baseline confirmed working 2026-10-27.** Version **1.0.4** was deployed to a live Appian 26.9
 instance and tested successfully: the plug-in installs, the Connected System configuration page
 renders its five fields (after three successive design-time failures), and the bundled Eclipse Paho
-client loads and publishes from inside the Appian plug-in classloader. Treat 1.0.4 / commit
-`7c9e12b` as the known-good reference point — when a later change breaks design-time rendering,
-diff against it rather than re-deriving the constraints in §1.
+client loads and publishes from inside the Appian plug-in classloader. It was the first build to
+render at all, after three successive design-time failures. (The current known-good reference is
+**1.0.6 / commit `68e15e8`** — see below. When a later change breaks design-time rendering, diff
+against that rather than re-deriving the constraints in §1.)
 
 What that deploy proved, each of which had been an unverified assumption:
 - `connected-systems-client` at scope `provided` **is** supplied by the Appian server (item 2).
@@ -424,11 +425,26 @@ What that deploy proved, each of which had been an unverified assumption:
 total) and the ungated design-time validation probe. The probe answered item 7: Appian displays
 nothing. The connected system page rendered its nine fields and publishing kept working.
 
-**1.0.6 is built on that working 1.0.5 baseline but NOT yet deployed.** It adds the subscribe (READ)
-integration — second integration module, second Paho call site — and acts on item 7 by deleting
-design-time validation and demoting its rules to an invocation-time check. The connected system is
-unchanged at nine fields, so a design-time regression here would be surprising; diff against 1.0.5
-if the configuration page misbehaves.
+**1.0.6 was deployed and tested successfully (2026-10-27) and is now the current known-good
+reference.** Use commit `68e15e8` as the diff target for anything that breaks later. It added the
+subscribe (READ) integration — second integration module, second Paho call site — and acted on item
+7 by deleting design-time validation and demoting its rules to an invocation-time check.
+
+What the 1.0.6 deploy additionally proved, each previously untested:
+- A **second `<integration-template>`** nested in the same `<connected-system-template>` registers
+  and is offered to designers alongside the first.
+- A **blocking wait inside an Appian integration request works** within the 30-second cap. Appian
+  did not time the request out first at the default 10-second wait.
+- `IntegrationTemplateRequestPolicy.READ` behaves as expected on a template that returns data.
+- A **single `TextPropertyDescriptor` topic filter** is sufficient for real subscriptions, MQTT
+  wildcards included. The list-descriptor question (`ListTypePropertyDescriptor` on an integration
+  input) therefore remains **open and untested** — it was deliberately avoided, not cleared.
+- The subscribe collection path — bounded queue, `offer()` drop, absolute `nanoTime` deadline,
+  teardown in `finally` — works against a real broker. It had never run anywhere before: the 1.0.3
+  version of this code was written but never deployed, because the configuration page did not render
+  until 1.0.4.
+- Removing design-time validation did not disturb page rendering, confirming item 7's conclusion
+  from the other direction.
 
 Items 1, 2, 5, 7 and 8 are resolved; 3, 4 and 6 are not.
 
@@ -543,15 +559,23 @@ Items 1, 2, 5, 7 and 8 are resolved; 3, 4 and 6 are not.
    slowest test takes ~0.3 s. The dead `net.jqwik` / `io.moquette` dependencies and the
    `**/*Properties.java` / `**/*IT.java` Surefire-Failsafe wiring that this item used to complain
    about were **removed** at 1.0.4 — see §2.
-5. **RESOLVED 2026-10-27: the project is now a git repository** on branch `main`, remote
-   `https://github.com/ahock/MQTT_Appian_ConnectedSystem.git`. Two commits:
+5. **RESOLVED 2026-10-27: the project is a git repository** on branch `main`, remote
+   `https://github.com/ahock/MQTT_Appian_ConnectedSystem.git`, pushed and in sync. History, newest
+   first:
+   - `68e15e8` **1.0.6 — deployed and tested working. The current known-good reference.** Diff
+     against this when anything breaks.
+   - `4bef5ec` recovery references repointed at git after the `.backup` zip was deleted.
+   - `f14c5b6` **1.0.5 — deployed and tested working.** Four session fields, validation probe.
+   - `fc506d8` *Reduction of 1.0.3 to initial working plugin* — **1.0.4, the first build that
+     rendered at all**, deployed and tested working.
+   - `91c9e81` deletes the `.backup` directory.
    - `d023a76` *first commit* — the complete **1.0.3** build, all 36 `.java` files. Restoring any
-     removed feature starts here: `git checkout d023a76 -- src pom.xml README.md`.
-   - `7c9e12b` *Reduction of 1.0.3 to initial working plugin* — the 1.0.4 minimal smoke build, and
-     the known-good reference point to diff against when design-time rendering breaks.
-   The 1.0.5 changes were committed subsequently; `4bef5ec` is the deployed-and-working 1.0.5 and is
-   now the better reference point for anything design-time. The 1.0.6 changes sit in the working
-   tree; committing them is the user's call.
+     removed feature starts here, e.g.
+     `git show d023a76:src/main/java/de/hock/mqtt/validation/InputValidator.java`.
+   Note: an earlier revision of this file cited `7c9e12b` for the 1.0.4 build. That SHA was rebased
+   away when the local branch was replayed onto `91c9e81`; its surviving equivalent in branch
+   history is **`fc506d8`**. Do not cite `7c9e12b` — it is unreachable from `main` and will be
+   garbage-collected.
    The former `.backup/mqtt-plugin-FULL-1.0.3-src.zip` was deleted in commit `91c9e81` as
    redundant: `d023a76` holds the same source as diffable files. Recovery is therefore always via
    git, never an archive.
