@@ -11,7 +11,7 @@
 > the gated behaviour this guide describes below ("A brand-new Connected System opens clean with no
 > validation messages", near line 116), which is history. For what actually ships, see [README.md](../README.md). The full source this guide
 > documents is in git commit `d023a76` and archived at
-> `.backup/mqtt-plugin-FULL-1.0.3-src.zip`. Everything below is retained unchanged because it stays
+> git commit `d023a76`. Everything below is retained unchanged because it stays
 > useful to whoever restores that archive — read it as history, not as a description of the current
 > plug-in.
 

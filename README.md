@@ -42,7 +42,7 @@ real instance before anything was added back.
 **All of it is recoverable.** The complete `1.0.3` source — 36 Java files plus the pom, README,
 `info.md`, `THIRD-PARTY-NOTICES.md`, `docs/` and `.kiro/` — is in git commit `d023a76`
 (`git checkout d023a76 -- src pom.xml README.md`) and archived at
-`.backup/mqtt-plugin-FULL-1.0.3-src.zip`. See
+git commit `d023a76`. See
 [Restoring the full build](#restoring-the-full-build).
 
 ## Facts
@@ -355,10 +355,10 @@ git show d023a76:src/main/java/de/hock/mqtt/validation/ConfigValidator.java   # 
 git checkout d023a76 -- src/main/java/de/hock/mqtt/tls                        # restore selectively
 ```
 
-The same tree is also archived as a zip (74 entries):
+To read a single archived file without touching the working tree:
 
 ```bash
-mkdir -p /tmp/mqtt-full && unzip .backup/mqtt-plugin-FULL-1.0.3-src.zip -d /tmp/mqtt-full
+git show d023a76:src/main/java/de/hock/mqtt/validation/InputValidator.java
 ```
 
 Restore selectively — the TLS layer, or the subscribe integration — rather than wholesale, and

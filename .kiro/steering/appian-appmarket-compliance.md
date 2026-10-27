@@ -19,7 +19,7 @@ documentation or a real build — not inferred.
 > Testament, reconnect attempt tuning and diagnostics remain removed.
 >
 > The complete `1.0.3` source is in git commit `d023a76` and archived at
-> `.backup/mqtt-plugin-FULL-1.0.3-src.zip`, so the richer history in `.agents/tasks/` describes a
+> git commit `d023a76`, so the richer history in `.agents/tasks/` describes a
 > **superset** of what now ships — do not read a reference to a removed field as a description of
 > the current build. The hard constraints in §1 and §2 all still apply; the project-specific figures
 > throughout were updated to the 1.0.5 reality. Records: `.agents/tasks/minimal-smoke-build.md` for
@@ -322,9 +322,9 @@ diff /tmp/bundle-expected.txt /tmp/bundle-actual.txt   # no output; '>' = orphan
 #   `public static final String INPUT_*` constants on the integration. Keep result-map keys
 #   ("success", "status", "topic", "qos") as inline literals.
 
-# The full 1.0.3 source archive must stay untouched and out of the jar.
-shasum -a 256 .backup/mqtt-plugin-FULL-1.0.3-src.zip
-#   386f3cab7ab660e19325f2825071152338eb48855e6f45b8d9665afcc22f89b4   (136397 bytes, 74 entries)
+# The full 1.0.3 source is recoverable from git, not from an archive.
+git show --stat d023a76 | head -3     # "first commit", the complete 1.0.3 build
+git ls-tree -r --name-only d023a76 | grep -c '\.java$'   # expect 36
 ```
 
 Then deploy to a real 26.9 instance before claiming compatibility: copy the JAR to
@@ -446,9 +446,9 @@ Items 1, 2, 5 and 8 are resolved; 3, 4, 6 and 7 are not — 7 is *being probed* 
    - `7c9e12b` *Reduction of 1.0.3 to initial working plugin* — the 1.0.4 minimal smoke build, and
      the known-good reference point to diff against when design-time rendering breaks.
    The 1.0.5 changes sit in the working tree; committing them is the user's call.
-   `.backup/mqtt-plugin-FULL-1.0.3-src.zip` is now redundant (it predates the repo and was caught by
-   `d023a76`, so the `.backup/` ignore rule cannot untrack it); `d023a76` holds the same source as
-   diffable files. Nothing had been pushed as of this note.
+   The former `.backup/mqtt-plugin-FULL-1.0.3-src.zip` was deleted in commit `91c9e81` as
+   redundant: `d023a76` holds the same source as diffable files. Recovery is therefore always via
+   git, never an archive.
 6. **`isImportCustomizable` on the encrypted field.** The restrictions page says an
    `EncryptedTextPropertyDescriptor` *should* set `isImportCustomizable(true)`; at 1.0.5 `password`
    is the only such field and it leaves the flag at the builder default `false`
@@ -560,8 +560,8 @@ Full evidence lives in `.agents/tasks/`.
 > discovered on the *full* plug-in, so it describes a **superset** of what now ships: certificate
 > fields, LWT, reconnect attempt tuning, subscribe and diagnostics all appear in these records and
 > none of them exist in the current build. The complete `1.0.3` source is in git commit `d023a76`
-> and archived at `.backup/mqtt-plugin-FULL-1.0.3-src.zip` (136397 bytes, 74 entries, sha256
-> `386f3cab7ab660e19325f2825071152338eb48855e6f45b8d9665afcc22f89b4`). The hard constraints in §1
+> (36 `.java` files); the former `.backup/` zip was deleted in `91c9e81` as redundant. The hard
+> constraints in §1
 > and §2 are what carried forward and still bind.
 
 - `validation-and-config-fields-1.0.5-plan.md` — the plan behind 1.0.5: the resolved SDK questions

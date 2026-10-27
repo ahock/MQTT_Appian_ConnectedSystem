@@ -26,7 +26,7 @@ import org.eclipse.paho.client.mqttv3.MqttException;
  * <p>This is requirement (4) of the reduction — proof that a real message reaches a real broker
  * through the bundled Paho library. The subscribe integration, retained publishing, the error
  * category taxonomy and the diagnostics/redaction layer are all gone; the full 1.0.3 surface is
- * archived at {@code .backup/mqtt-plugin-FULL-1.0.3-src.zip}.
+ * preserved in git commit {@code d023a76}.
  *
  * <p><strong>SDK shape.</strong> Extends {@link SimpleIntegrationTemplate} from
  * {@code com.appian:connected-systems-client}, the same simplified facade the Connected System

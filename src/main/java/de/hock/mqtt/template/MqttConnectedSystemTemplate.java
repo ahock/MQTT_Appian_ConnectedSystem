@@ -21,7 +21,7 @@ import de.hock.mqtt.validation.ConfigValidator;
  * nine fields — broker host, broker port, client identifier, username, password, connection
  * timeout, keep-alive interval, clean session and automatic reconnect — every one of which reaches
  * Paho at run time. TLS, Last Will and Testament and the subscribe integration are not present; the
- * full 1.0.3 surface is archived at {@code .backup/mqtt-plugin-FULL-1.0.3-src.zip}.
+ * full 1.0.3 surface is preserved in git commit {@code d023a76}.
  *
  * <p><strong>SDK shape.</strong> The class extends {@link SimpleConnectedSystemTemplate} from
  * {@code com.appian:connected-systems-client} and declares its fields in

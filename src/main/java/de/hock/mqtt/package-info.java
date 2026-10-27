@@ -16,6 +16,6 @@
  *
  * <p>TLS and certificates, the subscribe integration, Last Will and Testament and the
  * diagnostics/redaction layer remain deliberately removed; the complete 1.0.3 source is archived at
- * {@code .backup/mqtt-plugin-FULL-1.0.3-src.zip} and in git commit {@code d023a76}.
+ * git commit {@code d023a76}.
  */
 package de.hock.mqtt;
