@@ -1,5 +1,15 @@
 # MQTT Broker Connected System — Plug-in Guide
 
+> **⚠️ This guide describes the pre-reduction FULL build (1.0.x).** The plug-in that currently ships
+> is **1.0.4, a minimal smoke-test build**: one connected system with five fields (`brokerHost`,
+> `brokerPort`, `clientIdentifier`, `username`, `password`) and one publish integration with three
+> inputs (`topic`, `payload`, `qos`). TLS and certificates, the subscribe integration, Last Will and
+> Testament, reconnection tuning, diagnostics and design-time validation are **not present** in
+> 1.0.4. For what actually ships, see [README.md](../README.md). The full source this guide
+> documents is archived at `.backup/mqtt-plugin-FULL-1.0.3-src.zip`. Everything below is retained
+> unchanged because it stays useful to whoever restores that archive — read it as history, not as a
+> description of the current plug-in.
+
 An Appian Connected System plug-in that lets Appian applications publish messages to, and
 collect messages from, an MQTT broker. It packages one **Connected System template** (reusable
 connection, authentication, TLS, Last Will, and session configuration) and two **Integration

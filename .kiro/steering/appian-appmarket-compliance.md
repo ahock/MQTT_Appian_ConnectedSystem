@@ -4,6 +4,17 @@ Project-specific rules for this plug-in, derived from two real AppMarket rejecti
 audit (2026-10-12). Target platform: **Appian 26.9**. Everything below was confirmed against Appian
 documentation or a real build — not inferred.
 
+> **Scope note (2026-10-27, 1.0.4).** The project was **deliberately reduced to a minimal
+> smoke-test build** at `1.0.4`: one connected system with five fields (`brokerHost`, `brokerPort`,
+> `clientIdentifier`, `username`, `password`) and one publish integration with three inputs
+> (`topic`, `payload`, `qos`). TLS and certificates, the subscribe integration, Last Will and
+> Testament, reconnection and session tuning, diagnostics and design-time validation were all
+> removed. The complete `1.0.3` source is archived at `.backup/mqtt-plugin-FULL-1.0.3-src.zip`, so
+> the richer history in `.agents/tasks/` describes a **superset** of what now ships — do not read a
+> reference to a removed field as a description of the current build. The hard constraints in §1
+> and §2 all still apply; the project-specific figures throughout were updated to the reduced
+> reality. The reduction record is `.agents/tasks/minimal-smoke-build.md`.
+
 ---
 
 ## 1. Hard constraints — breaking any of these gets the submission rejected
@@ -19,17 +30,18 @@ was originally `com.appian.mqtt` and was rejected for it.
 
 **Critical trap:** the Appian SDK's own packages are `com.appiancorp.*` **and
 `com.appian.connectedsystems.*`**. A find-and-replace of the string `com.appian` will silently
-corrupt ~45 SDK imports in `src/main/java`. Only ever rename the exact token `com.appian.mqtt`.
+corrupt every SDK import in `src/main/java`. Only ever rename the exact token `com.appian.mqtt`.
 Verify after any rename:
 
 ```bash
 # Only this file's own prose should match; no hit may be in src/, pom.xml or the built jar.
 grep -rn 'com\.appian\.mqtt' . | grep -v '/target/' | grep -v '/.agents/' | grep -v '/.kiro/'
-grep -rc 'import com.appian.connectedsystems' src/main/java/                # must stay ~45
+grep -rh 'import com.appian.connectedsystems' src/main/java/ | wc -l  # ~22, across 2 files
+grep -rl 'com\.appian\.connectedsystems' src/main/java | wc -l        # 2 (both templates)
 ```
 
-The import count dropped from 47 to 45 with the `Simple*` migration (2026-10-13): three low-level
-imports gave way to two `com.appian.connectedsystems.simplified.sdk.*` ones in each template.
+The import count was 47, then 45 with the `Simple*` migration (2026-10-13), and dropped to **22
+across 2 files** when the plug-in was reduced to the minimal smoke-test build at 1.0.4.
 
 ### Sources must ship *inside* the plug-in JAR
 
@@ -39,6 +51,10 @@ must be entries in the same archive as the `.class` files.
 
 Implemented as a `<fileSet>` over `src/main/java` in the assembly descriptor, landing sources at the
 archive root mirroring the package structure (`de/hock/mqtt/Foo.java` beside `Foo.class`).
+
+At 1.0.4 that is **4 sources**: `de/hock/mqtt/package-info.java`, `de/hock/mqtt/MqttPublisher.java`,
+`de/hock/mqtt/template/MqttConnectedSystemTemplate.java` and
+`de/hock/mqtt/integration/MqttPublishIntegration.java`. It was 34 before the reduction.
 
 Do **not** solve this with a `<build><resources>` block in `pom.xml`. Declaring `<resources>`
 replaces the default resource root, so `src/main/resources` must then be re-declared or
@@ -57,9 +73,9 @@ entirely. Verify the listing shows a bare `appian-plugin.xml`.
 
 Appian's plug-in classloader resolves bundled JARs from `META-INF/lib/`. This project originally
 shipped Paho at root `lib/`, which would very likely have failed at runtime with
-`NoClassDefFoundError`, since `PahoMqttClientAdapter`, `ConnectOptionsFactory`, and both integration
-templates reference Paho directly. Set the assembly `dependencySet` `<outputDirectory>` to
-`META-INF/lib`.
+`NoClassDefFoundError`. At 1.0.4 exactly one class references Paho —
+`de.hock.mqtt.MqttPublisher` — so a classloading failure names it and nothing else. Set the
+assembly `dependencySet` `<outputDirectory>` to `META-INF/lib`.
 
 *Status: fixed, but never validated against a live Appian instance. Confirm on deploy.*
 
@@ -69,7 +85,7 @@ This caused the second rejection.
 
 | Field | Format | Our value |
 |---|---|---|
-| `<plugin-info><version>` | **three-part `x.y.z`** | `1.0.3` |
+| `<plugin-info><version>` | **three-part `x.y.z`** | `1.0.4` |
 | `<application-version min=...>` | four-part Appian platform version | `26.9.0.0` |
 
 Appian's [configuration files page](https://docs.appian.com/suite/help/26.9/csp-configuration-files.html)
@@ -126,14 +142,22 @@ holding pasted PEM in 1.0.3. There is **no document-upload field available on a 
 template** with this SDK. `ParagraphPropertyDescriptor` is the only multi-line text input, since
 `DisplayHint` offers only `NORMAL` and `EXPRESSION`.
 
+**The table and the lesson above are the reusable finding and stay.** The two certificate fields it
+describes no longer exist at 1.0.4, and `ParagraphPropertyDescriptor` is no longer used by this
+plug-in at all — the five surviving connected system fields are Text, Integer and EncryptedText
+only. The table matters again the moment anything is restored from the archive.
+
 Verify both halves — and note the source grep is the weaker check of the two:
 
 ```bash
-# Necessary: no explicit call in the template. Repo-wide total 7, all in the integration package.
+# Necessary: no explicit call in the template. Repo-wide total 3, all on the publish integration.
 grep -c isExpressionable src/main/java/de/hock/mqtt/template/MqttConnectedSystemTemplate.java  # 0
-grep -rn isExpressionable src/main/java/ | wc -l                                               # 7
-grep -rc isExpressionable src/main/java/de/hock/mqtt/integration/   # Publish:4  Subscribe:3
+grep -rn isExpressionable src/main/java/ | wc -l                                               # 3
+grep -rc isExpressionable src/main/java/de/hock/mqtt/integration/   # MqttPublishIntegration:3
 ```
+
+The template's Javadoc deliberately avoids the literal token `isExpressionable` so the first grep
+stays a clean zero rather than matching prose.
 
 Sufficient: `MqttConnectedSystemTemplateDescriptorTest.noConnectedSystemPropertyDescriptorIsExpressionable`
 renders the descriptor and reads every modifier back through `PropertyDescriptor.isExpressionable()`,
@@ -146,7 +170,7 @@ the two document fields.
 
 - Maven. `maven-assembly-plugin:3.7.1`, execution `build-appian-plugin`, phase `package`, goal
   `single`, descriptor `src/assembly/plugin-assembly.xml`.
-- **Submission artifact:** `target/mqtt-broker-connected-system-1.0.3-plugin.jar` — the `-plugin`
+- **Submission artifact:** `target/mqtt-broker-connected-system-1.0.4-plugin.jar` — the `-plugin`
   suffix comes from the assembly `<id>`. A JAR without it is a stale build.
 - **Exactly one JAR must land in `target/`.** Previously two were produced and *both* carried
   `appian-plugin.xml` at the root, so either looked deployable. Keep it to one.
@@ -154,8 +178,14 @@ the two document fields.
   Appian 26.9 requires Java 17.
 - SDK: `com.appian:connected-systems-core:1.9.1`, scope `provided` (never bundle it).
 - SDK: `com.appian:connected-systems-client:1.3.0`, scope `provided` (never bundle it) — the
-  `Simple*` facade the three templates subclass. Added 2026-10-13; see §5 item 2.
+  `Simple*` facade both templates subclass. Added 2026-10-13; see §5 item 2.
 - `org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5`, bundled.
+- Tests: `org.junit.jupiter:junit-jupiter:5.10.2`, scope `test` — **and nothing else**.
+  `net.jqwik:jqwik` and `io.moquette:moquette-broker` were removed at 1.0.4, together with the
+  `maven-failsafe-plugin` block and the Surefire `**/*Properties.java` / `**/*IT.java` wiring. No
+  file ever matched those patterns, so the configuration was advertising coverage that did not
+  exist — in sources AppMarket reviewers read. Surefire's default `**/*Test.java` include covers
+  both remaining test classes, so it needs no `<configuration>` block.
 - `THIRD-PARTY-NOTICES.md` ships at the archive root, naming Paho's permissive EDL-1.0 option of its
   dual EPL-2.0 / EDL-1.0 license. Keep it current when dependencies change.
 
@@ -175,15 +205,23 @@ From the [submission policies](https://docs.appian.com/suite/help/26.9/Shared_Co
 Current sweep is clean; keep it that way.
 
 - Logging through **Log4j only**. No `System.out`, `System.err`, `printStackTrace()`,
-  `java.util.logging`.
+  `java.util.logging`. This plug-in satisfies the rule by logging **nothing at all** — it declares
+  no logging dependency and makes no print call, and failure detail goes into the integration
+  response instead. That is a deliberate choice, not an oversight: adding log4j even at `provided`
+  scope would add another unverified server-classpath assumption to a build whose purpose is to
+  eliminate them. If logging is wanted later, `org.apache.log4j.Logger` at `provided` scope is the
+  only sanctioned route.
 - **No `System.setProperty()`** or any JVM/server global mutation. Relevant here: MQTT-over-TLS is
   commonly implemented by setting `javax.net.ssl.*` system properties — never do that. Build an
   in-memory `SSLContext` and hand the socket factory to Paho via
-  `MqttConnectOptions.setSocketFactory()`.
+  `MqttConnectOptions.setSocketFactory()`. (Moot at 1.0.4: there is no TLS. The rule applies again
+  the moment TLS is restored from the archive.)
 - `Closeable` resources closed in a guaranteed fashion (try-with-resources / `finally`); temp files
-  deleted.
+  deleted. At 1.0.4 this is `MqttPublisher`, which disconnects and closes its client in a
+  `finally` block.
 - No direct filesystem manipulation. Use `ContentService` / Document APIs for Appian documents.
-  Watch `CertificateLoader` for temp keystore writes.
+  At 1.0.4 `MqttPublisher` passes `MemoryPersistence` to Paho, because Paho's default persistence
+  writes to disk.
 - No hardcoded credentials, default passwords, or key pairs anywhere, including tests and docs. Use
   the Secure Credentials Store.
 - No copyleft third-party libraries.
@@ -197,23 +235,53 @@ Run all of this and read the output — a green build alone proves nothing.
 
 ```bash
 cd /Users/andreas.hock/Documents/Appian-Projects/MQTT_Component
-mvn -o clean package
-J=target/mqtt-broker-connected-system-1.0.3-plugin.jar
+mvn -o clean package                             # BUILD SUCCESS
+mvn -o test                                      # Tests run: 7, Failures: 0, Errors: 0
+J=target/mqtt-broker-connected-system-1.0.4-plugin.jar
 
-ls target/*.jar                                  # exactly ONE jar
-unzip -l $J | grep -c '\.java$'                  # 34 sources (33 before PemValidator in 1.0.3)
-unzip -l $J | grep -cE ' appian-plugin.xml$'     # 1, at root (no prefix)
-unzip -l $J | grep -c 'META-INF/lib/org.eclipse.paho'  # 1
-unzip -l $J | grep -c 'META-INF/lib/.*connected-systems'  # 0, both Appian artifacts are provided
+ls target/*.jar | wc -l                          # 1 — exactly ONE jar
+unzip -l $J | grep -c '\.java$'                  # 4 sources
+unzip -l $J | grep '\.java$' | grep -vc 'de/hock/mqtt/'   # 0 — none outside the package
+unzip -l $J | grep -cE ' appian-plugin\.xml$'    # 1
+unzip -l $J | awk '{print $NF}' | grep -c '^appian-plugin.xml$'   # 1 — bare root, no prefix
+unzip -l $J | grep -c 'META-INF/lib/.*\.jar$'    # 1 — Paho is the only nested jar
+unzip -l $J | grep -c 'META-INF/lib/org.eclipse.paho'     # 1
+unzip -l $J | grep -ci 'connected-systems'       # 0, both Appian artifacts are provided
 unzip -l $J | grep -c 'com/appian/mqtt'          # 0
 unzip -l $J | grep -ci test                      # 0
+unzip -l $J | grep -ci 'backup'                  # 0 — nothing from .backup/
+unzip -l $J | awk '{print $NF}' | grep -c '^THIRD-PARTY-NOTICES.md$'   # 1
 unzip -p $J appian-plugin.xml | grep -E '<version>|application-version|<vendor'
+#   <version>1.0.4</version> / min="26.9.0.0" / vendor name="Hock"
 javap -verbose -cp target/classes de.hock.mqtt.template.MqttConnectedSystemTemplate \
   | grep 'major version'                         # 61
+javap -verbose -cp target/classes de.hock.mqtt.MqttPublisher | grep 'major version'   # 61
 
 # Expressionability — the grep is necessary, the test is what actually proves it (see §1).
 grep -c isExpressionable src/main/java/de/hock/mqtt/template/MqttConnectedSystemTemplate.java  # 0
-grep -rn isExpressionable src/main/java/ | wc -l                                               # 7
+grep -rn isExpressionable src/main/java/ | wc -l                                               # 3
+grep -rc isExpressionable src/main/java/ | grep -v ':0$'
+#   expect exactly one line: .../integration/MqttPublishIntegration.java:3
+
+# Resource bundle: no orphan keys, no missing keys (12 keys, 8 of them field labels).
+B=src/main/resources/resources_en_US.properties
+sed -nE 's/^([A-Za-z][A-Za-z.]*)=.*/\1/p' $B | sort > /tmp/bundle-actual.txt
+{ echo MqttConnectedSystemTemplate.name; echo MqttConnectedSystemTemplate.description
+  sed -nE 's/.*public static final String [A-Z_]+ *= *"([A-Za-z]+)".*/MqttConnectedSystemTemplate.\1.label/p' \
+    src/main/java/de/hock/mqtt/template/MqttConnectedSystemTemplate.java
+  echo MqttPublishIntegration.name; echo MqttPublishIntegration.description
+  sed -nE 's/.*public static final String INPUT_[A-Z_]+ *= *"([A-Za-z]+)".*/MqttPublishIntegration.\1.label/p' \
+    src/main/java/de/hock/mqtt/integration/MqttPublishIntegration.java
+} | sort > /tmp/bundle-expected.txt
+diff /tmp/bundle-expected.txt /tmp/bundle-actual.txt   # no output; '>' = orphan, '<' = missing
+#   The two sed patterns hold only while the five config keys are the ONLY
+#   `public static final String` constants on the template and the three input keys the only
+#   `public static final String INPUT_*` constants on the integration. Keep result-map keys
+#   ("success", "status", "topic", "qos") as inline literals.
+
+# The full 1.0.3 source archive must stay untouched and out of the jar.
+shasum -a 256 .backup/mqtt-plugin-FULL-1.0.3-src.zip
+#   386f3cab7ab660e19325f2825071152338eb48855e6f45b8d9665afcc22f89b4   (136397 bytes, 74 entries)
 ```
 
 Then deploy to a real 26.9 instance before claiming compatibility: copy the JAR to
@@ -236,8 +304,8 @@ Carry these forward. Item 2 is resolved; the rest are not.
    state construction, and `getRootState()` is only `getState().get("root")` — `null` for a new
    connected system. `PropertyState`'s constructor is package-private, so the sole public route is
    `StateGenerator`, which is exactly what `SimpleConfiguration.setProperties` runs
-   (`generateFromExistingState` plus `withTypes`, so the local type is registered too). All three
-   templates now extend `SimpleConnectedSystemTemplate` / `SimpleIntegrationTemplate` from
+   (`generateFromExistingState` plus `withTypes`, so the local type is registered too). Both
+   templates extend `SimpleConnectedSystemTemplate` / `SimpleIntegrationTemplate` from
    `com.appian:connected-systems-client:1.3.0`, scope `provided`; `connected-systems-core` stays at
    **1.9.1** — no downgrade. Client 1.3.0 is core 1.9.1's own generation (published one day apart)
    and declares no dependencies, so it cannot drag in a conflicting core; the `Simple*` public API is
@@ -248,67 +316,62 @@ Carry these forward. Item 2 is resolved; the rest are not.
    the fallback is to keep the `Simple*` shape's logic but construct the descriptor by hand with
    `StateGenerator` + `withType` + `withState` on the low-level interfaces. Do **not** fall back by
    bundling the client jar. A code comment once claimed `SimpleConnectedSystemTemplate` doesn't exist
-   in this SDK — false; don't reintroduce it. **Added 2026-10-13:** design-time validation is now
-   gated on the *same* first-render signal as the Clean Session seed
-   (`priorState == null || getValueAtPath(cleanSession) == null`), so the round-trip assumption below
-   governs **two** behaviors rather than one — if Appian supplies only persisted state instead of the
-   descriptor the template returned, Clean Session can never be turned off *and* validation never
-   runs. The discriminating deploy check is: clear the Clean Session checkbox, save, reopen the
-   object, and confirm it is still cleared. The older "untouched Clean Session persists as enabled"
-   check passes under both platform behaviors and proves nothing.
+   in this SDK — false; don't reintroduce it. The `Simple*` resolution is still load-bearing and
+   must not be undone. **Superseded at 1.0.4:** the first-render gate and the Clean Session seed
+   that a 2026-10-13 note added here were both **removed**, together with `cleanSession` as a field.
+   The round-trip assumption they rested on therefore no longer governs any behavior, and the
+   "clear the Clean Session checkbox, save, reopen" deploy check no longer applies. It becomes
+   relevant again only if design-time validation is restored from the archive.
 3. **No connected system logos.** Appian expects
    `src/main/resources/de/hock/mqtt/MqttConnectedSystemTemplate_{40,50,80}px.png`. Without them the
    connected system renders iconless. Separate from the AppMarket listing icon (§6).
-4. **Test coverage is design-time only — 19 tests in two classes** (3 in `ProjectStructureTest`, 16
-   in `MqttConnectedSystemTemplateDescriptorTest`). `ProjectStructureTest`
-   checks that the base package resolves and two resources are on the classpath;
-   `MqttConnectedSystemTemplateDescriptorTest` (added 2026-10-13) drives all three templates'
-   `getConfigurationDescriptor` with the empty descriptor Appian supplies for a new object and
-   asserts a non-null root state, a registered and resolvable root type, all 20 config field keys
-   plus both integrations' 4 input keys, the Clean Session default, and a field-scoped validation
-   error. It also asserts both halves of the first-render behavior:
-   `firstRenderOfANewConnectedSystemHasNoValidationErrors` (no errors on any of the 20 fields on a
-   brand-new object), `blankBrokerHostIsReportedOnEverySubsequentRender` (clean first render, error
-   on the second), and `enteringAValueClearsItsErrorWhileOtherFieldsStillReport` (a supplied value
-   clears only its own error, proving `ConfigValidator` was not weakened). All three fail if the
-   `!firstRender` gate is removed — verified by temporarily un-gating.
-   **Added 2026-10-14 (1.0.3):** the class now also pins the platform's descriptor-modifier rules.
-   `noConnectedSystemPropertyDescriptorIsExpressionable` reads every modifier back through
-   `PropertyDescriptor.isExpressionable()` and names each offender — it is what caught the two
-   forced-expressionable document fields a source grep could not see, and it fails if
-   `.isExpressionable(true)` is reintroduced (verified by temporarily re-adding it to `brokerHost`).
-   `integrationInputExpressionabilityIsPinnedPerInput` pins the other half per input, asymmetry
-   included (publish all 4; subscribe `topicFilters`/`maxWaitSeconds`/`maxMessageCount` yes, `qos`
-   no). `connectedSystemDescriptorsSatisfyThePlatformModifierRules` asserts `RefreshPolicy.NEVER`,
-   not hidden, and no `List`/`Document`/`AppianValue` descriptor type.
-   `certificateFieldsAreMultiLinePastedTextNotDocuments`,
-   `pastedPemCertificateReachesTheTlsLayerAsBytes` (pasted PEM → UTF-8 bytes → X.509 parse →
-   `SSLSocketFactory`, the one runtime path with real coverage),
-   `aLegacyDocumentReferenceInACertificateFieldIsReportedAsNonPem` and
-   `validPastedPemIsNotReportedAsAnError` cover the 1.0.3 certificate change. Nothing exercises
-   publish, subscribe at runtime, LWT, reconnection, or diagnostics. `net.jqwik:jqwik:1.8.4` and
-   `io.moquette:moquette-broker:0.17` are declared with surefire/failsafe wired for
-   `**/*Properties.java` and `**/*IT.java`, but **no such files exist** — dead config advertising
-   coverage that isn't there. This matters more now that reviewers read the shipped sources.
+4. **Test coverage is design-time only — 7 tests in two classes** (2 in `ProjectStructureTest`, 5 in
+   `MqttConnectedSystemTemplateDescriptorTest`), down from 19 at 1.0.3.
+   `ProjectStructureTest` checks that `appian-plugin.xml` and `resources_en_US.properties` are on
+   the classpath. `MqttConnectedSystemTemplateDescriptorTest` drives both templates'
+   `getConfigurationDescriptor` with the empty descriptor Appian supplies for a new object
+   (`ConfigurationDescriptor.builder().build()`, whose `getRootState()` is `null`) and asserts:
+   - `brandNewConnectedSystemRendersANonNullRootStateWithAResolvableRootType` — the NPE regression
+     guard, and the single most valuable test here.
+   - `exactlyTheFiveExpectedConfigFieldKeysArePresent` — the five config keys as an **ordered list**,
+     so a sixth field fails too. Verified by temporarily adding one.
+   - `noConnectedSystemPropertyDescriptorIsExpressionable` — reads every modifier back through
+     `PropertyDescriptor.isExpressionable()` and names each offender. It is what caught the two
+     forced-expressionable document fields a source grep could not see, and it fails if
+     `.isExpressionable(true)` is reintroduced; verified by temporarily re-adding it to `brokerHost`,
+     which failed naming `brokerHost (TextPropertyDescriptor)`.
+   - `connectedSystemFieldsUseNoListDocumentOrAppianValueDescriptor` — `RefreshPolicy.NEVER`, not
+     hidden, and no `List`/`Document`/`AppianValue` descriptor type.
+   - `publishIntegrationRendersItsRootStateAndItsThreeExpressionableInputs` — the three input keys
+     in display order, and all three expressionable, which pins the deliberate asymmetry with the
+     connected system.
+
+   Config keys covered: 5. Publish input keys covered: 3. **Nothing exercises a real publish**, and
+   no test needs a broker. The dead `net.jqwik` / `io.moquette` dependencies and the
+   `**/*Properties.java` / `**/*IT.java` Surefire-Failsafe wiring that this item used to complain
+   about were **removed** at 1.0.4 — see §2.
 5. **Not a git repository.** No history for a submission Appian source-reviews and reserves the right
    to retain.
-6. **`isImportCustomizable` on the encrypted fields.** The restrictions page says an
-   `EncryptedTextPropertyDescriptor` *should* set `isImportCustomizable(true)`; `password`,
-   `clientPrivateKey` and `keyPassphrase` leave it at the builder default `false`. It is a "should",
-   it played no part in any of the three deploy failures, and enabling it changes cross-environment
-   deployment behavior — so it is carried forward, not fixed.
-7. **Whether design-time validation works at all on a connected system is unresolved.** The same
-   restrictions page says `setErrors()` is ignored on a connected system. `validate` uses
-   `PropertyState.setErrorAtPath`, which decompiles to a delegation to `setErrorsAtPath` — a
-   different method — so whether the restriction covers it cannot be settled from the documentation.
-   If it does, the entire design-time validation feature **and** the first-render gate built on it
-   are decorative. Resolve by observation: on a saved object, clear a required field and look for the
-   message. This is the top deploy-time question.
-8. **A reported field error is never cleared.** `validate` only attaches errors and never calls the
-   SDK's `clearErrorsAtPath`, so an error set on one render survives the next even after the value is
-   corrected. Pre-existing and independent of the three descriptor fixes; whether it is visible
-   depends on the same round-trip assumption as item 2. `validPastedPemIsNotReportedAsAnError`
-   documents the boundary deliberately rather than asserting the clearing behavior.
+6. **`isImportCustomizable` on the encrypted field.** The restrictions page says an
+   `EncryptedTextPropertyDescriptor` *should* set `isImportCustomizable(true)`; at 1.0.4 `password`
+   is the only such field and it leaves the flag at the builder default `false`
+   (`clientPrivateKey` and `keyPassphrase` no longer exist). It is a "should", it played no part in
+   any of the three deploy failures, and enabling it changes cross-environment deployment
+   behavior — so it is carried forward, not fixed.
+7. **Whether design-time validation works at all on a connected system is unresolved — and MOOT at
+   1.0.4.** The restrictions page says `setErrors()` is ignored on a connected system, while the
+   template used `PropertyState.setErrorAtPath`, which decompiles to a delegation to
+   `setErrorsAtPath` — a different method — so the documentation cannot settle it. At 1.0.4 the
+   template calls neither: design-time validation was removed outright, `isRequired` is the only
+   design-time guard, and the publish integration re-checks host, port, topic and QoS at run time.
+   The question therefore blocks nothing today. Keep the finding for whoever restores validation
+   from the archive; resolve it then, by observation — on a saved object, clear a required field and
+   look for the message.
+8. **A reported field error is never cleared — RESOLVED BY REMOVAL at 1.0.4.** The old `validate`
+   only attached errors and never called the SDK's `clearErrorsAtPath`, so an error set on one
+   render survived the next even after the value was corrected. There is no validation and no
+   attached error at 1.0.4, so there is nothing to clear. The defect is still real in the archived
+   full build: fix it there before restoring validation.
 9. **The platform validators cannot be inspected offline.**
    `ConnectedSystemPropertiesValidator` and its siblings are `com.appiancorp.*` — platform-side, not
    SDK-side. `connected-systems-core-1.9.1.jar` contains 0 `com/appiancorp/` entries and 0
@@ -354,7 +417,27 @@ Appian documentation content was rephrased for compliance with licensing restric
 
 ## 8. Session audit trail
 
-Full evidence lives in `.agents/tasks/`:
+Full evidence lives in `.agents/tasks/`.
+
+> **Read this first.** The project was **deliberately reduced to a minimal smoke-test build at
+> 1.0.4** (2026-10-27). Everything below records how the platform and packaging constraints were
+> discovered on the *full* plug-in, so it describes a **superset** of what now ships: certificate
+> fields, LWT, reconnection, subscribe, diagnostics and design-time validation all appear in these
+> records and none of them exist in the current build. The complete `1.0.3` source is archived at
+> `.backup/mqtt-plugin-FULL-1.0.3-src.zip` (136397 bytes, 74 entries, sha256
+> `386f3cab7ab660e19325f2825071152338eb48855e6f45b8d9665afcc22f89b4`). The hard constraints in §1
+> and §2 are what carried forward and still bind.
+
+- `minimal-smoke-build-plan.md` — the plan behind the 1.0.4 reduction: the delete/keep lists, the
+  resolved judgement calls, and the verification block now mirrored in §4.
+- `minimal-smoke-build.md` — the reduction record: every deleted and kept file with a reason, the
+  five config fields and three publish inputs as implemented, the invariant evidence with real
+  command output, the deploy-and-test checklist, and how to restore the full build. **Start here
+  for what currently ships.**
+- `minimal-smoke-build-review.json` / `minimal-smoke-build-review.md` — independent review of the
+  reduction.
+
+Earlier records, all pre-reduction:
 
 - `appmarket-packaging-audit.md` — read-only audit proving zero `.java` entries in the original JARs,
   with the option comparison behind the assembly-`fileSet` decision.

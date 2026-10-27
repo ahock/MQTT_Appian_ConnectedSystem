@@ -1,40 +1,73 @@
-# MQTT Broker Connected System
+# MQTT Broker Connected System — Minimal Smoke-Test Build
 
-An Appian Connected System plug-in that lets Appian applications publish messages to, and collect
-messages from, an MQTT broker. A designer configures the broker connection once (host, credentials,
-TLS, Last Will and Testament, reconnection, session) on a Connected System object, then creates
-Integration objects from it to publish a message or to collect a bounded batch of messages from one
-or more topic filters. Built on the Eclipse Paho MQTT v3 client.
+**This is a minimal smoke-test build.** Version `1.0.4` exists to validate exactly four things and
+nothing else:
+
+1. the plug-in **installs** on Appian 26.9,
+2. the bundled **Eclipse Paho** MQTT library loads and is usable at run time,
+3. a **Connected System configuration page renders** with a few basic parameters,
+4. **one integration can actually publish** to a broker.
+
+It is a deliberate, requested scope reduction from the full `1.0.3` plug-in — not a regression. The
+full build hit three successive deploy-time platform-contract failures, so this build strips the
+surface back to a known-good baseline that can be confirmed on a real instance before anything is
+added back.
+
+## What was deliberately removed
+
+- **TLS and certificates** — `tlsEnabled`, `caCertificate`, `clientCertificate`,
+  `clientPrivateKey`, `keyPassphrase`, the trust/key-manager construction and the `SSLContext`
+  wiring. This build speaks plain `tcp://` only.
+- **The subscribe integration** — `MqttSubscribeIntegration` and its bounded polling/queue/deadline
+  machinery.
+- **Last Will and Testament** — `lwtTopic`, `lwtPayload`, `lwtQos`, `lwtRetained`.
+- **Reconnection and session tuning** — `autoReconnectEnabled`, `maxReconnectAttempts`,
+  `reconnectIntervalSeconds`, `keepAliveSeconds`, `cleanSession`, and `connectionTimeoutSeconds` as
+  a configurable field (a 5-second connect timeout is hardcoded instead).
+- **Diagnostics and redaction** — the whole `diagnostics` package and the `MqttErrorCategory`
+  taxonomy.
+- **Design-time validation** — no `validate()`, no `setErrorAtPath`, no first-render gate. See
+  [Configuring the Connected System](#configuring-the-connected-system).
+- The `retained` publish input.
+
+**All of it is recoverable.** The complete `1.0.3` source — 36 Java files plus the pom, README,
+`info.md`, `THIRD-PARTY-NOTICES.md`, `docs/` and `.kiro/` — is archived at
+`.backup/mqtt-plugin-FULL-1.0.3-src.zip`. See
+[Restoring the full build](#restoring-the-full-build).
+
+## Facts
 
 - **Plug-in key:** `de.hock.mqtt`
-- **Version:** `1.0.3` (manifest `<plugin-info><version>`)
+- **Version:** `1.0.4` (manifest `<plugin-info><version>`, three-part `x.y.z`)
 - **Minimum Appian version:** `26.9.0.0`
 - **Vendor:** Hock, <https://itondemand.com>
 
+The plug-in key and both module keys are unchanged from `1.0.3`, and `1.0.4 > 1.0.3`, so this build
+**replaces** the installed plug-in rather than installing alongside it.
+
 ## What this plug-in provides
 
-`src/main/resources/appian-plugin.xml` registers one connected system template with two nested
-integration templates:
+`src/main/resources/appian-plugin.xml` registers one connected system template with one nested
+integration template:
 
 | Module | Manifest key | Designer-facing name | Class |
 |---|---|---|---|
 | Connected system template | `MqttConnectedSystemTemplate` | MQTT Broker | `de.hock.mqtt.template.MqttConnectedSystemTemplate` |
 | Integration template (`WRITE`) | `MqttPublishIntegration` | Publish MQTT Message | `de.hock.mqtt.integration.MqttPublishIntegration` |
-| Integration template (`READ`) | `MqttSubscribeIntegration` | Subscribe to MQTT Topics | `de.hock.mqtt.integration.MqttSubscribeIntegration` |
 
 ### This plug-in does not contribute a smart service
 
 Worth stating plainly, because it is a common expectation: there is no custom smart service here.
 The manifest declares no `<smart-service>` module and there is no smart service class under
-`src/main/java`. What you get is a connected system plus two integration templates.
+`src/main/java`. What you get is a connected system plus one integration template.
 
 The usage model follows from that:
 
 1. Create one **Connected System** object of type **MQTT Broker** and fill in the broker settings.
-2. Create **Integration** objects against that connected system, choosing **Publish MQTT Message**
-   or **Subscribe to MQTT Topics**.
-3. Call those integration objects from interfaces and expressions, or from a process model using
-   Appian's **built-in "Call Integration" smart service node**.
+2. Create an **Integration** object against that connected system, choosing **Publish MQTT
+   Message**.
+3. Call that integration object from an expression, or from a process model using Appian's
+   **built-in "Call Integration" smart service node**.
 
 That `Call Integration` node is part of the Appian platform, not something this plug-in installs.
 
@@ -42,11 +75,11 @@ That `Call Integration` node is part of the Appian platform, not something this 
 
 - Appian **26.9** (manifest sets `<application-version min="26.9.0.0"/>`)
 - **Java 17** to build (`maven.compiler.release` is `17`)
-- A reachable **MQTT broker** speaking MQTT 3.1.1 over TCP or TLS
+- A reachable **MQTT broker** speaking MQTT 3.1.1 over **plain TCP** — there is no TLS in this build
 - `com.appian:connected-systems-core:1.9.1`, Maven scope `provided` — supplied by the Appian
   runtime, never bundled
 - `com.appian:connected-systems-client:1.3.0`, Maven scope `provided` — the `Simple*` template
-  facade the three templates subclass; also supplied by the Appian runtime, never bundled
+  facade both templates subclass; also supplied by the Appian runtime, never bundled
 - `org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5`, bundled inside the plug-in jar under
   `META-INF/lib/`
 
@@ -56,16 +89,16 @@ That `Call Integration` node is part of the Appian platform, not something this 
 mvn clean package
 ```
 
-The deployment and AppMarket submission artifact is:
+The deployment artifact is:
 
 ```
-target/mqtt-broker-connected-system-1.0.3-plugin.jar
+target/mqtt-broker-connected-system-1.0.4-plugin.jar
 ```
 
 The `-plugin` suffix comes from the assembly `<id>`; a jar without it is a stale build. Exactly one
 jar is produced by design — the default `maven-jar-plugin` execution is bound to phase `none`, so
-there is no second archive that also looks deployable. The jar carries the plug-in's own `.java`
-sources alongside the compiled classes (an AppMarket requirement), `appian-plugin.xml` at the
+there is no second archive that also looks deployable. The jar carries the plug-in's **four `.java`
+sources** alongside the compiled classes (an AppMarket requirement), `appian-plugin.xml` at the
 archive root, and Paho as a nested jar under `META-INF/lib/`.
 
 ## Deploy
@@ -73,7 +106,7 @@ archive root, and Paho as a nested jar under `META-INF/lib/`.
 Copy the jar into the plug-ins directory of the Appian installation:
 
 ```bash
-cp target/mqtt-broker-connected-system-1.0.3-plugin.jar APPIAN_INSTALL/_admin/plugins/
+cp target/mqtt-broker-connected-system-1.0.4-plugin.jar APPIAN_INSTALL/_admin/plugins/
 ```
 
 Hot deployment is governed by the `conf.plugins.poll-interval` custom property (seconds). When it is
@@ -82,139 +115,44 @@ See [Appian Suite Plug-ins](https://docs.appian.com/suite/help/26.9/Appian_Plug-
 
 Confirm the deployment three ways:
 
-- The **Admin Console → Plug-ins** page lists the plug-in.
-- **New > Connected System** in Appian Designer offers the **MQTT Broker** type.
+- The **Admin Console → Plug-ins** page lists the plug-in at version `1.0.4`.
+- **New > Connected System** in Appian Designer offers the **MQTT Broker** type **and the form
+  renders five fields**. This is the check the three previous releases failed.
 - `tomcat-stdOut.log` shows a `Successfully installed Plug-in` line plus
   `ConnectedSystemTemplateModuleParser` registration lines.
 
 ## Configuring the Connected System
 
-Create a Connected System object and pick the **MQTT Broker** template. Fields below are listed in
-the order the template renders them. Keys are the internal field identifiers from
-`de.hock.mqtt.validation.ConfigFields`; labels are from `resources_en_US.properties`.
+Create a Connected System object and pick the **MQTT Broker** template. The five fields below are
+the whole configuration surface, listed in the order the template renders them. Keys are the
+constants on `de.hock.mqtt.template.MqttConnectedSystemTemplate`; labels are from
+`resources_en_US.properties`.
 
-**No connected system configuration field is expressionable.** Every field below takes a literal
-value only. This is an Appian platform restriction rather than a design choice: a connected system
-template that declares an expressionable property descriptor is rejected outright at
-descriptor-conversion time, and the configuration form then fails to render at all. Expressions are
-supported on the **integration inputs** instead — see
-[Using the Publish integration](#using-the-publish-integration) and
-[Using the Subscribe integration](#using-the-subscribe-integration).
+| Label | Key | Type | Required | Notes |
+|---|---|---|---|---|
+| Broker Host | `brokerHost` | Text | Yes | Host name or address |
+| Broker Port | `brokerPort` | Integer | Yes | Placeholder suggests `1883` |
+| Client Identifier | `clientIdentifier` | Text | No | Auto-generated by Paho when left blank |
+| Username | `username` | Text | No | Leave both credential fields blank for an anonymous connection |
+| Password | `password` | Encrypted text, masked | No | Stored encrypted; not rendered back after save |
 
-Design-time validation attaches each error to its own field and keeps the entered values, so a
-rejected save re-displays what you typed.
+**No connected system field is expressionable.** Every field takes a literal value only. This is an
+Appian platform restriction rather than a design choice: a connected system template that declares
+an expressionable property descriptor is rejected outright at descriptor-conversion time, and the
+configuration form then fails to render at all. Expressions are supported on the **integration
+inputs** instead.
 
-A brand-new Connected System **opens clean**: no validation messages appear before you have entered
-anything, so you are not greeted by "Broker host is required" on an empty form. Validation runs from
-the next render onward — the moment you interact with the form or save it — and from then on every
-required-field and bounds error is reported against its own field.
+**There is no design-time validation in this build.** `isRequired` is the only guard: Appian itself
+enforces that Broker Host and Broker Port are filled in. The template declares its five properties
+and returns — it attaches no field errors. That is deliberate, for three reasons: whether Appian
+honours field errors on a connected system at all is unresolved (the 26.9 restrictions page says
+`setErrors` is ignored there), the full build never cleared an error once attached, and the
+`cleanSession` field the first-render gate was built on no longer exists. The publish integration
+re-checks host, port, topic and QoS at invocation time instead, before it contacts a broker.
 
-### Connection
-
-| Label | Key | Type | Required | Default | Validation |
-|---|---|---|---|---|---|
-| Broker Host | `brokerHost` | Text | Yes | — | Non-blank, at most 253 characters |
-| Broker Port | `brokerPort` | Integer | Yes | — | Whole number 1–65535 |
-| Client Identifier | `clientIdentifier` | Text | No | Auto-generated | When supplied, 1–65535 characters |
-| Connection Timeout (seconds) | `connectionTimeoutSeconds` | Integer | No | `30` | When supplied, whole number 1–300 |
-
-Leaving **Client Identifier** blank auto-generates one via
-`de.hock.mqtt.validation.ClientIdentifierGenerator`: always 23 characters, made up of the fixed
-prefix `appian-` plus 16 characters from `[0-9a-zA-Z]` derived from a SHA-256 digest of `host:port`.
-The same host and port always yield the same identifier.
-
-### Authentication
-
-| Label | Key | Type | Required | Default | Validation |
-|---|---|---|---|---|---|
-| Username | `username` | Text | No | — | At most 256 characters |
-| Password | `password` | Encrypted text (masked) | No | — | At most 256 characters |
-
-Username and password are **both-or-neither**: supplying one without the other is rejected with
-"Username and password must both be provided or both be omitted." Leave both blank for an anonymous
-connection. At connect time, credentials are applied to Paho only when both a non-blank username and
-a non-empty password are present.
-
-### TLS
-
-| Label | Key | Type | Required | Default | Notes |
-|---|---|---|---|---|---|
-| Enable TLS | `tlsEnabled` | Boolean (checkbox) | No | `false` | Selects the `ssl://` scheme instead of `tcp://` |
-| CA Certificate (PEM) | `caCertificate` | Text, multi-line (pasted PEM) | No | — | Validates the broker; falls back to the platform trust store when absent |
-| Client Certificate (PEM) | `clientCertificate` | Text, multi-line (pasted PEM) | No | — | X.509 certificate for mutual TLS |
-| Client Private Key | `clientPrivateKey` | Encrypted text (masked) | No | — | Unencrypted PKCS#8, PEM or DER |
-| Key Passphrase | `keyPassphrase` | Encrypted text (masked) | No | — | Stored and redacted; see the caveat below |
-
-When TLS is enabled, `ConnectOptionsFactory` creates an `SSLContext` for `TLSv1.2` and wraps the
-resulting socket factory so each socket offers only `TLSv1.2` and `TLSv1.3`. Mutual TLS requires
-**both** a client certificate and a private key; one without the other fails with category
-`CONFIGURATION` and the message "Mutual TLS requires both a client certificate and its private key."
-**Both certificate fields take pasted PEM text**, including the `-----BEGIN CERTIFICATE-----` and
-`-----END CERTIFICATE-----` lines. Paste the certificate exactly as the file contains it; the text is
-sent to the X.509 parser as UTF-8 bytes. This makes the three TLS material fields consistent, since
-**Client Private Key was already a text field**. Certificates are public key material, so holding
-them as text is not a secret-handling downgrade — the private key and its passphrase remain
-encrypted and masked.
-
-The **client certificate and private key** are parsed by `CertificateLoader` at design time whenever
-TLS is enabled and either value is present, so malformed client material is rejected before a
-handshake would fail. The **CA certificate is shape-checked** at design time — a value with no
-`-----BEGIN` line is reported on its field — but it is first fully parsed at connect time by
-`ConnectOptionsFactory`, so a well-formed but invalid CA certificate surfaces on the first
-connection attempt as category `CONFIGURATION`.
-
-Three things worth knowing before you plan a TLS rollout:
-
-- **Key Passphrase is not used to decrypt the key.** `CertificateLoader` parses *unencrypted*
-  PKCS#8 only (`PKCS8EncodedKeySpec`, trying RSA, EC, DSA, Ed25519), and the passphrase is never
-  passed to it. The value is stored encrypted and is redacted from output, but a passphrase-protected
-  key will not load.
-- **Certificate uploads are gone, and TLS with a certificate should now work for the first time.**
-  Up to `1.0.2` both certificate fields were `DocumentPropertyDescriptor` uploads whose saved value
-  was an opaque document id that this SDK version offers no way to resolve into bytes — so a custom
-  CA or a client certificate was never actually presented to the broker. They had to change
-  regardless: the SDK forces a document descriptor to be expressionable, which Appian rejects on a
-  connected system template outright.
-- **Upgrading from `1.0.2` or earlier is a breaking change for these two fields.** An existing
-  connected system holds a document reference where PEM text is now expected, and that value will
-  not parse. Reopen each affected object with TLS enabled and you will see a field error naming the
-  problem; clear the field and paste the certificate's PEM text. Nothing that previously worked is
-  lost, for the reason in the preceding bullet.
-
-### Reconnection
-
-| Label | Key | Type | Required | Default | Validation |
-|---|---|---|---|---|---|
-| Enable Automatic Reconnect | `autoReconnectEnabled` | Boolean (checkbox) | No | `false` | — |
-| Max Reconnect Attempts | `maxReconnectAttempts` | Integer | No | `3` | When supplied, integer 0–10 |
-| Reconnect Interval (seconds) | `reconnectIntervalSeconds` | Integer | No | `5` | When supplied, integer 1–120 |
-
-With automatic reconnect on, Paho's `setAutomaticReconnect(true)` is enabled and
-`setMaxReconnectDelay` is set to the reconnect interval in milliseconds, bounding Paho's exponential
-backoff. **`maxReconnectAttempts` is validated and carried in the configuration but is not enforced
-anywhere at runtime** — no code caps the attempt count. Treat the field as inert for now.
-
-### Last Will and Testament
-
-| Label | Key | Type | Required | Default | Validation |
-|---|---|---|---|---|---|
-| LWT Topic | `lwtTopic` | Text | No | — | When supplied, 1–65535 characters; required when a payload is set |
-| LWT Payload | `lwtPayload` | Text | No | — | 0–268435455 bytes (sent as UTF-8) |
-| LWT QoS | `lwtQos` | Text with choices `0` / `1` / `2` | No | `0` | Must be 0, 1, or 2 when LWT is configured |
-| LWT Retained | `lwtRetained` | Boolean (checkbox) | No | `false` | — |
-
-A payload without a topic is rejected: "An LWT topic is required when an LWT payload is configured."
-The will is registered with the broker only when both a topic and a payload are present.
-
-### Session
-
-| Label | Key | Type | Required | Default | Validation |
-|---|---|---|---|---|---|
-| Clean Session | `cleanSession` | Boolean (checkbox) | No | `true` when unset | — |
-| Keep Alive (seconds) | `keepAliveSeconds` | Integer | No | `60` | When supplied, whole number 0–65535 |
-
-Disabling Clean Session makes the client identifier mandatory: "A client identifier is required when
-the clean session is disabled (persistent session)."
+**Broker Port is suggested, not seeded.** The field shows `1883` as a placeholder; it is not
+pre-filled. Actually seeding a value would need a first-render signal to avoid overwriting what you
+type on every re-render, and that machinery is exactly what this build removes.
 
 ## Using the Publish integration
 
@@ -223,289 +161,129 @@ Message**. It publishes a single message and is marked `WRITE`.
 
 ### Inputs
 
-| Label | Key | Type | Required | Default | Validation |
+| Label | Key | Type | Required | Default | Expressionable |
 |---|---|---|---|---|---|
-| Topic | `topic` | Text | Yes | — | 1–65535 UTF-8 bytes; must not contain `+` or `#` |
-| Payload | `payload` | Text | No | empty | Sent as UTF-8 bytes, 0–268435455 bytes |
-| QoS | `qos` | Text with choices `0` / `1` / `2` | Yes | `0` when blank | Must be 0, 1, or 2 |
-| Retained | `retained` | Boolean (checkbox) | No | `false` | — |
+| Topic | `topic` | Text | Yes | — | Yes |
+| Payload | `payload` | Text | Yes | — | Yes |
+| QoS | `qos` | Integer | No | `0` when blank | Yes |
 
-**All four inputs accept expressions.** Unlike the connected system fields, integration inputs may
-be expressionable, so each of `topic`, `payload`, `qos`, and `retained` can be driven by a rule or
-process variable.
+`payload` is sent as UTF-8 bytes. `qos` shows `0` as a placeholder and falls back to `0` at run time
+when left blank; a value outside 0–2 is rejected before any broker contact.
 
-A non-integer `qos` becomes an out-of-range sentinel rather than silently defaulting, so it is
-reported as a validation error. Input validation runs before any broker contact: a rejected input
-returns a `VALIDATION` failure without opening a connection.
+**All three inputs accept expressions.** Unlike the connected system fields, integration inputs may
+be expressionable, so each of `topic`, `payload` and `qos` can be driven by a rule or process
+variable. That asymmetry is deliberate and pinned by a test.
 
 ### Output
 
-On success the response data map carries:
+On success the response result is a flat map:
 
 | Field | Meaning |
 |---|---|
+| `success` | `true` |
 | `status` | `delivered` for QoS 1 or 2 (the broker acknowledged), `dispatched` for QoS 0 (handed off without acknowledgment) |
 | `topic` | The topic the message was published to |
 | `qos` | The QoS the message was published at |
 
+On failure the response carries an error only, with no result map. `error.title` is one of:
+
+| Title | Meaning |
+|---|---|
+| `Invalid input` | A blank topic, a blank broker host, a port outside 1–65535, or a QoS outside 0–2. No broker was contacted. |
+| `MQTT publish failed` | Paho could not connect or publish. `error.message` names the topic, the broker host and port, the QoS, and the underlying Paho message. |
+
+Error messages are truncated to 500 characters. No secret is placed in a response — the password is
+never read into a message.
+
 ### Example
 
 Because this integration is `WRITE`, invoke it from a context that permits side effects — a process
-model's Call Integration node, or a save on an interface. The call shape:
+model's Call Integration node, or a save on an interface:
 
 ```
 rule!MQTT_PublishMessage(
-  topic: "appian/orders/created",
-  payload: a!toJson(ri!order),
-  qos: "1",
-  retained: false
+  topic: "appian/smoketest",
+  payload: "hello from Appian",
+  qos: 0
 )
 ```
 
-The response follows Appian's standard integration shape, so `success` selects between the data map
-above and the error:
+The response follows Appian's standard integration shape:
 
 ```
 if(
   local!publishResponse.success,
   local!publishResponse.result.status,
-  local!publishResponse.error.title
+  local!publishResponse.error.message
 )
 ```
 
-Substitute the name of your own integration object; `topic`, `payload`, `qos`, and `retained` are
-the real input names. On failure, `error.title` is the `MqttErrorCategory` name.
+Substitute the name of your own integration object; `topic`, `payload` and `qos` are the real input
+names.
 
-## Using the Subscribe integration
+## Runtime behavior, stated honestly
 
-Create an Integration object against the same connected system and choose **Subscribe to MQTT
-Topics**. It is marked `READ` — it does not mutate broker state.
+One **connect → publish → disconnect** per request, through `de.hock.mqtt.MqttPublisher` — the
+single Paho call site in the plug-in. Specifically:
 
-### Inputs
+- **5-second connect timeout**, hardcoded, so an unreachable broker fails fast rather than hanging
+  an Appian request thread.
+- **10-second cap** on any single blocking Paho call (`setTimeToWait`).
+- **No connection reuse**, no session manager, no reconnection, no background threads, no Last Will.
+- **Plain `tcp://` only.** No `ssl://`, no `SSLContext`, no socket factory, and no
+  `System.setProperty` call anywhere — Appian's plug-in policies forbid JVM-global mutation, which
+  is the usual shortcut for MQTT-over-TLS.
+- `MemoryPersistence` rather than Paho's default file persistence, so nothing is written to the
+  filesystem.
+- The client is disconnected and closed in a `finally` block, so a failed publish never leaks a
+  connection.
 
-| Label | Key | Type | Required | Validation |
-|---|---|---|---|---|
-| Topic Filters | `topicFilters` | List of Text | Yes | 1–10 filters, each non-blank (the offending index is named in the error) |
-| Quality of Service | `qos` | Text with choices `0` / `1` / `2` | Yes | Must be 0, 1, or 2 |
-| Max Wait (seconds) | `maxWaitSeconds` | Integer | Yes | 1–300 |
-| Max Message Count | `maxMessageCount` | Integer | Yes | 1–1000 |
-
-**Expressions are accepted on `topicFilters`, `maxWaitSeconds`, and `maxMessageCount`, but not on
-`qos`**, which is a fixed choice list. The asymmetry is deliberate: `topicFilters` is a list input,
-and Appian requires a list-typed integration input to be expressionable.
-
-### Semantics: how the collection terminates
-
-Appian integrations are request/response while MQTT delivery is event-driven, so this integration
-collects a **bounded batch per invocation**. It is not a long-lived listener. Per invocation it:
-
-1. Acquires a session and registers a message sink feeding a `LinkedBlockingQueue` whose capacity is
-   exactly `maxMessageCount`. Overflow beyond that capacity is dropped (the sink uses `offer`, never
-   blocking the Paho callback).
-2. Subscribes to every filter at the requested QoS.
-3. Drains the queue in 200 ms poll slices, appending each message and then draining anything already
-   buffered, until **either** `maxMessageCount` messages have been collected **or** the
-   `maxWaitSeconds` budget elapses — whichever comes first.
-4. Unsubscribes and releases the session in a `finally` block, so a failed or timed-out collection
-   never leaks the connection.
-
-Collecting nothing before the wait elapses is a **success with an empty collection**, not an error.
-Messages are returned in arrival order. For continuous ingestion, invoke the integration repeatedly
-on a schedule and tune the two limits.
-
-### Output
-
-| Field | Meaning |
-|---|---|
-| `messages` | List of collected messages, in arrival order |
-| `messageCount` | Number of messages in `messages` |
-
-Each entry in `messages` has:
-
-| Field | Meaning |
-|---|---|
-| `topic` | The originating topic the message was published on |
-| `payload` | The payload as text, or a Base64 string when the payload is binary |
-| `qos` | The QoS the message was delivered at |
-| `retained` | Whether the broker flagged the message retained |
-| `binary` | `true` when `payload` is Base64-encoded binary, `false` when it is text |
-
-Payload classification is strict: bytes that decode as valid UTF-8 are passed through as text with
-`binary: false`; anything else is Base64-encoded with `binary: true`.
-
-### Example
-
-```
-a!localVariables(
-  local!result: rule!MQTT_SubscribeTopics(
-    topicFilters: {"sensors/+/temperature"},
-    qos: "1",
-    maxWaitSeconds: 10,
-    maxMessageCount: 50
-  ),
-  local!result.result.messageCount
-)
-```
-
-Unlike a publish topic, subscribe filters may contain the MQTT wildcards `+` and `#`.
-
-## Calling the integrations
-
-**From a process model.** Add Appian's built-in **Call Integration** smart service node, point it at
-your integration object, and map the inputs above to process variables. Map the response to a
-process variable to read `status`, or `messages` and `messageCount`. Again: this node ships with
-Appian; the plug-in contributes no smart service of its own.
-
-**From an interface or expression.** Call the integration object like any other rule, as in the two
-examples above. The Publish integration is `WRITE`, so Appian will only let you invoke it from a
-save or a context that permits side effects — not during interface evaluation. The Subscribe
-integration is `READ` and can be evaluated from an interface, though its wait budget blocks for up to
-`maxWaitSeconds`, which makes a process or a saved interaction the better host for anything beyond a
-very short wait.
-
-## Error handling and diagnostics
-
-Every failure maps to exactly one value of `de.hock.mqtt.MqttErrorCategory`, so expressions can
-branch on a bounded set instead of parsing message text. The category name becomes the
-`IntegrationError` **title**, and the message is truncated to at most 500 characters.
-
-| Category | Meaning |
-|---|---|
-| `VALIDATION` | Design-time or runtime input failed validation |
-| `AUTHENTICATION` | The broker rejected the supplied credentials |
-| `CONNECTION_TIMEOUT` | The connection attempt did not complete within the timeout |
-| `TLS_VALIDATION` | The TLS handshake or certificate validation failed |
-| `DELIVERY_TIMEOUT` | A QoS 1/2 publish was not acknowledged within the timeout |
-| `DISCONNECTION` | An established connection to the broker was lost |
-| `CONFIGURATION` | The connection configuration is invalid or unusable |
-| `UNKNOWN` | An unrecognized failure that could not be classified |
-
-There are **two** classification paths, and they do not agree in every case.
-
-Publish and subscribe failures on an established connection go through
-`ExceptionCategoryTranslator`, which inspects both the throwable and its cause chain:
-`MqttSecurityException` and Paho's authentication reason codes map to `AUTHENTICATION`; an
-`SSLException`/`SSLHandshakeException` anywhere in the chain, or Paho's SSL config and
-socket-factory-mismatch codes, map to `TLS_VALIDATION`; client-timeout and server-connect-error
-codes or a `SocketTimeoutException` map to `CONNECTION_TIMEOUT`; connection-lost and
-client-not-connected map to `DISCONNECTION`; write-timeout and max-inflight map to
-`DELIVERY_TIMEOUT`; everything else maps to `UNKNOWN`.
-
-Failures raised while *establishing* the connection are classified separately by
-`MqttConnectionManager`, on the Paho reason code alone with no cause-chain inspection: the
-authentication codes map to `AUTHENTICATION`, client-timeout and connect-in-progress map to
-`CONNECTION_TIMEOUT`, the SSL config code maps to `TLS_VALIDATION`, and **every other reason code
-falls through to `DISCONNECTION`** rather than `UNKNOWN`. A TLS handshake that fails during connect
-with a wrapped `SSLHandshakeException` is therefore reported as `DISCONNECTION`, not
-`TLS_VALIDATION`. Keep that in mind when debugging a connect-time category.
-
-Both connect-time paths name the broker host and port in the message: a failed connect reads
-"Failed to establish a connection to MQTT broker host:port: …", and a lost cached session reads
-"Connection to MQTT broker host:port was lost."
-
-### Diagnostics pane
-
-Each invocation attaches an `IntegrationDesignerDiagnostic` with a response diagnostic map
-containing, in order:
-
-| Key | Value |
-|---|---|
-| `brokerHost` | The configured broker host |
-| `operation` | `Publish` or `Subscribe` |
-| `outcome` | `SUCCESS` or `FAILURE` |
-| `errorCategory` | The `MqttErrorCategory` name, present only on failure |
-
-**Nothing secret appears there.** `Redactor` is built from the configuration's username, password,
-client private key, and key passphrase, and replaces every literal occurrence of each non-blank
-secret with `***` in every diagnostic value and in every error message before it is returned. Blank
-secrets are ignored so an empty password cannot cause unrelated text to be rewritten. Do not expect
-to recover a credential from the diagnostics pane — that is deliberate.
-
-On a failure the response carries **only** the error title and message — `ResponseMapper` returns the
-result data map on the success path only, so there is no structured error payload to read. A
-subscribe validation failure still reports every rejected input, enumerated in the message itself as
-`"Invalid subscribe inputs: <field>: <message>; <field>: <message>"`, subject to the same
-500-character truncation.
-
-## Security notes
-
-- **Never hardcode credentials.** Put the broker username and password in the connected system
-  configuration. `password`, `clientPrivateKey`, and `keyPassphrase` are declared as
-  `EncryptedTextPropertyDescriptor` with `masked(true)`, so Appian stores them encrypted, masks them
-  in the UI, and does not render them back after save. Those three encrypted fields are the
-  mechanism for secrets on the connected system. A Secure Credentials Store reference **cannot** be
-  used here: connected system fields take literal values only, so there is no expression in which to
-  resolve one. Expressions, including SCS references, are available on the **integration inputs**.
-- **No JVM global mutation.** The plug-in deliberately does **not** set `javax.net.ssl.*` system
-  properties, which is the usual shortcut for MQTT-over-TLS and which Appian's plug-in policies
-  forbid. Instead `ConnectOptionsFactory` builds an in-memory `SSLContext` with trust managers from
-  the configured CA certificate and key managers from the client certificate/key, then hands the
-  resulting socket factory to Paho via `MqttConnectOptions.setSocketFactory`. Nothing is written to
-  the filesystem and no server-wide setting is touched.
-- **TLS material stays in memory.** Certificates and keys are parsed from bytes into an in-memory
-  `KeyStore`; no temporary keystore file is created. Private-key bytes converted for parsing are
-  zero-filled immediately after use, and secrets are held as `char[]` rather than `String` where the
-  configuration carries them.
-- **Secrets never enter the connection cache key.** The session fingerprint used for connection
-  reuse reduces every secret to a presence plus hash token rather than embedding plaintext.
-- **Logging.** The plug-in contains no `System.out`, `System.err`, or `printStackTrace()` calls;
-  failures surface through the integration response rather than ad-hoc output.
+The plug-in contains no logging at all — no Log4j dependency, and no `System.out`, `System.err`,
+`printStackTrace()` or `java.util.logging` call. Failure detail surfaces in the integration
+response, which is where a Designer sees it.
 
 ## Known limitations
 
-Stated plainly so nobody is surprised in production:
-
-- **Automated test coverage is design-time only.** `src/test/java/de/hock/mqtt/ProjectStructureTest.java`
-  checks that the base package resolves and that `appian-plugin.xml` and
+- **Automated test coverage is design-time only — 7 tests in two classes.**
+  `src/test/java/de/hock/mqtt/ProjectStructureTest.java` checks that `appian-plugin.xml` and
   `resources_en_US.properties` are on the classpath;
-  `src/test/java/de/hock/mqtt/template/MqttConnectedSystemTemplateDescriptorTest.java` drives all
-  three templates' configuration descriptors and asserts the generated root state, the registered
-  root types, the declared field keys, the Clean Session default, and field-scoped validation
-  errors. It also asserts both halves of the first-render behavior: a brand-new Connected System
-  renders with no validation errors on any of its 20 fields, and a blank required field **is**
-  reported on every subsequent render — including the case where filling one field clears only that
-  field's error. It additionally pins the platform's descriptor-modifier rules — that no connected
-  system field is expressionable, that the integration inputs still are, per input, and that no field
-  uses a descriptor type the SDK forces to be expressionable — and proves the certificate handoff by
-  parsing a pasted PEM certificate through to an SSL socket factory. **19 tests across the two
-  classes.** Beyond that one TLS path, no automated test exercises publish, subscribe, LWT, or
-  reconnection at runtime, or diagnostics. `net.jqwik` and `io.moquette` are declared and
-  Surefire/Failsafe are wired for `**/*Properties.java` and `**/*IT.java`, but no such files exist.
-  Smoke-test against a real broker before relying on this.
-- **Two behaviors depend on an unverified platform assumption.** The clean first render and the
-  Clean Session `true` default both read the incoming configuration state to decide whether this is
-  a brand-new object, so both assume Appian hands the template back a descriptor derived from the one
-  it last returned. If the platform instead supplies only persisted object state, that signal stays
-  permanently "new": Clean Session could not be turned off, and validation would never report at all.
-  The check that distinguishes the two is clearing **Clean Session**, saving, and reopening the
-  object — it must still be cleared. Unverified on a live instance.
-- **The `connected-systems-client` requirement on the server classpath is unverified.**
-  `MqttConnectedSystemTemplate` subclasses `SimpleConnectedSystemTemplate` and both integrations
-  subclass `SimpleIntegrationTemplate` — the documented shape, and the shape that makes the
-  configuration form render, because the facade generates the descriptor's root state. Both Appian
-  artifacts are `provided`, so the Appian server must supply `com.appian:connected-systems-client`
-  at runtime. That is the documented development path, but like the `META-INF/lib/` layout below it
-  has not been confirmed on a live instance. A `NoClassDefFoundError` naming
-  `com/appian/connectedsystems/simplified/sdk/...` at install or first render would mean the server
-  does not provide it.
-- **The Paho-under-`META-INF/lib/` packaging has not been validated on a live Appian instance.** The
-  layout matches where Appian's plug-in classloader resolves nested jars, but it is unverified in
-  practice. Confirm on first deploy.
-- **`maxReconnectAttempts` is inert.** Validated and stored, never enforced (see above).
-- **Key Passphrase cannot unlock an encrypted private key** (see the TLS section).
-- **Upgrading from `1.0.2` breaks the two certificate fields**, which now take pasted PEM instead of
-  a document upload (see the TLS section).
+  `src/test/java/de/hock/mqtt/template/MqttConnectedSystemTemplateDescriptorTest.java` drives both
+  templates' configuration descriptors and asserts a non-null root state with a resolvable root
+  type, exactly the five expected field keys in order, that no connected system descriptor reads
+  back expressionable, that no field uses a List/Document/AppianValue descriptor type, and that the
+  publish integration renders its three inputs and all three stay expressionable. **Nothing
+  exercises a real publish** — that is what the deploy-time smoke test is for.
+- **The `META-INF/lib/` layout is still unverified on a live instance.** It matches where Appian's
+  plug-in classloader resolves nested jars, but it has never been confirmed in practice. A
+  `NoClassDefFoundError` naming `org/eclipse/paho/...` at first publish would mean it is wrong — and
+  it would name `de.hock.mqtt.MqttPublisher` as the caller, which is the whole reason the Paho call
+  site is isolated in one class.
+- **The `connected-systems-client` requirement on the server classpath is unverified.** Both
+  templates subclass the `Simple*` facade and both Appian artifacts are `provided`, so the Appian
+  server must supply `com.appian:connected-systems-client` at run time. A `NoClassDefFoundError`
+  naming `com/appian/connectedsystems/simplified/sdk/...` at install or first render would mean it
+  does not.
 - **Connected system fields cannot be driven by expressions.** An Appian platform restriction, not a
   design choice. Per-environment values therefore have to come from separate connected system
-  objects or from deployment-time customization, not from an expression. Integration inputs are
-  unaffected.
-- **A field error, once reported, is not cleared by fixing the field within the same render cycle.**
-  Design-time validation only attaches errors; it never calls the SDK's `clearErrorsAtPath`. Whether
-  a stale message is actually visible depends on whether Appian returns the previously rendered
-  state, which is the same unverified round-trip assumption noted above.
+  objects or from deployment-time customization. Integration inputs are unaffected.
 - **No connected system logo assets.** Appian looks for
   `src/main/resources/de/hock/mqtt/MqttConnectedSystemTemplate_{40,50,80}px.png`; without them the
   connected system renders without an icon.
+- **No existing Connected System object can break on upgrade.** The configuration page never
+  rendered successfully on `1.0.0`–`1.0.3`, so no MQTT Broker connected system was ever created
+  against this plug-in.
+
+## Restoring the full build
+
+```bash
+mkdir -p /tmp/mqtt-full && unzip .backup/mqtt-plugin-FULL-1.0.3-src.zip -d /tmp/mqtt-full
+```
+
+The archive holds the complete `1.0.3` tree (74 entries). Restore selectively — a single validator,
+the TLS layer, or the subscribe integration — rather than wholesale, and re-read
+[the steering file](.kiro/steering/appian-appmarket-compliance.md) first: the three platform
+contracts that broke `1.0.1`–`1.0.3` still apply to anything you put back, and the version must be
+bumped past `1.0.4`.
 
 ## License and third-party software
 
@@ -517,12 +295,14 @@ Paho is dual-licensed under EPL-2.0 and EDL-1.0; redistribution here relies on t
 
 ## Links
 
-- [docs/mqtt-plugin-guide.md](docs/mqtt-plugin-guide.md) — the developer guide, with use cases,
-  behavior notes, and binary payload handling in more depth.
+- [.agents/tasks/minimal-smoke-build.md](.agents/tasks/minimal-smoke-build.md) — the reduction
+  record: every deleted and kept file, the verification evidence, and the deploy-and-test checklist.
+- [docs/mqtt-plugin-guide.md](docs/mqtt-plugin-guide.md) — **describes the pre-reduction full
+  build**, not what ships here. Useful if you restore the archive.
 - [.kiro/steering/appian-appmarket-compliance.md](.kiro/steering/appian-appmarket-compliance.md) —
   the AppMarket packaging and submission constraints for this plug-in (namespace, version formats,
-  sources-in-jar, submission process). Consult it before packaging a release or submitting a new
-  version; it is not summarized here.
+  sources-in-jar, descriptor restrictions, submission process). Consult it before packaging a
+  release or submitting a new version; it is not summarized here.
 
 Appian documentation content referenced above was rephrased for compliance with licensing
 restrictions.

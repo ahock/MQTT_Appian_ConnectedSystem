@@ -49,9 +49,8 @@
         <!--
           Bundle runtime-scoped third-party libraries as nested jars under META-INF/lib/, which is
           where the Appian plug-in classloader resolves them from. Paho is referenced directly by
-          PahoMqttClientAdapter, ConnectOptionsFactory and both integrations, so it must resolve.
-          useProjectArtifact=false + scope runtime keep the provided-scope connected-systems-core
-          out of the archive.
+          MqttPublisher, so it must resolve. useProjectArtifact=false + scope runtime keep the
+          provided-scope connected-systems-core and connected-systems-client out of the archive.
         -->
         <dependencySet>
             <outputDirectory>META-INF/lib</outputDirectory>

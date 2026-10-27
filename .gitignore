@@ -11,3 +11,8 @@ target/
 
 # OS
 .DS_Store
+
+# Kiro
+.kiro/cache/
+
+.backup/

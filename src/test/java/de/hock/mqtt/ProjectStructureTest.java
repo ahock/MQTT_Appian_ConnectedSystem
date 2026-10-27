@@ -1,28 +1,20 @@
 package de.hock.mqtt;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Scaffolding smoke test (Task 1).
+ * Packaging smoke test: the two resources Appian needs must be on the classpath.
  *
- * <p>Confirms the base package resolves and the plug-in descriptor resources are present and
- * packaged on the classpath, so the Maven module builds, tests, and packages end-to-end. These
- * assertions are replaced/augmented by real unit and property tests in later tasks.
+ * <p>If {@code appian-plugin.xml} is missing, Appian ignores the plug-in entirely; if
+ * {@code resources_en_US.properties} is missing, the templates and their fields render without
+ * names or labels. Both must also land as bare root entries in the assembled jar, which the
+ * packaging-invariant checks in {@code .agents/tasks/minimal-smoke-build.md} verify against the
+ * built artifact.
  */
 class ProjectStructureTest {
-
-    @Test
-    void basePackageIsPresent() {
-        Package basePackage = ProjectStructureTest.class.getPackage();
-        assertNotNull(basePackage, "Base package should resolve");
-        assertTrue(
-            basePackage.getName().startsWith("de.hock.mqtt"),
-            "Tests live under the de.hock.mqtt base package");
-    }
 
     @Test
     void pluginDescriptorIsOnClasspath() throws Exception {
