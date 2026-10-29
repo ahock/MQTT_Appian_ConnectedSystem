@@ -16,6 +16,7 @@ import de.hock.mqtt.ConnectionConfigValidator;
 import de.hock.mqtt.MqttPublisher;
 import de.hock.mqtt.template.MqttConnectedSystemTemplate;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -41,8 +42,8 @@ import org.eclipse.paho.client.mqttv3.MqttException;
  * <em>expressionable</em>, which is legal and useful on an integration — and the deliberate
  * opposite of the connected system, where Appian rejects any expressionable descriptor.
  *
- * <p><strong>Execution.</strong> {@code execute} reads the three inputs and the nine connected
- * system values — including the four session settings, which are passed straight through to
+ * <p><strong>Execution.</strong> {@code execute} reads the three inputs and the eleven connected
+ * system values — including the two TLS settings and the four session settings, all passed through to
  * {@link MqttPublisher#buildConnectOptions} where a {@code null} takes its documented default —
  * applies three cheap run-time guards that fail before any broker contact, and then calls
  * {@link MqttPublisher#publish}. The guards are, in order: a blank {@code topic}; the shared
@@ -126,6 +127,12 @@ public class MqttPublishIntegration extends SimpleIntegrationTemplate {
         MqttConnectedSystemTemplate.textValue(connection, MqttConnectedSystemTemplate.BROKER_HOST);
     int brokerPort =
         MqttConnectedSystemTemplate.intValue(connection, MqttConnectedSystemTemplate.BROKER_PORT, 0);
+    Boolean tlsEnabled =
+        MqttConnectedSystemTemplate.booleanValue(
+            connection, MqttConnectedSystemTemplate.TLS_ENABLED);
+    String caCertificate =
+        MqttConnectedSystemTemplate.textValue(
+            connection, MqttConnectedSystemTemplate.CA_CERTIFICATE);
     String clientIdentifier =
         MqttConnectedSystemTemplate.textValue(
             connection, MqttConnectedSystemTemplate.CLIENT_IDENTIFIER);
@@ -166,6 +173,8 @@ public class MqttPublishIntegration extends SimpleIntegrationTemplate {
       MqttPublisher.publish(
           brokerHost,
           brokerPort,
+          tlsEnabled,
+          caCertificate,
           clientIdentifier,
           username,
           password,
@@ -176,6 +185,13 @@ public class MqttPublishIntegration extends SimpleIntegrationTemplate {
           keepAliveSeconds,
           cleanSession,
           autoReconnectEnabled);
+    } catch (GeneralSecurityException e) {
+      // Fixed message, deliberately: never let a crypto exception's text reach a response, in case a
+      // future JDK starts quoting its input. Unparseable PEM was already rejected by the validator.
+      return error(
+          "Invalid configuration",
+          "The TLS configuration of the MQTT Broker connected system could not be applied."
+              + " Check the CA Certificate field.");
     } catch (MqttException | RuntimeException e) {
       return error(
           "MQTT publish failed",

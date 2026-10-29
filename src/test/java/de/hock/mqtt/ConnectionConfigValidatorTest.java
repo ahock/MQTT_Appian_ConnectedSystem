@@ -1,6 +1,7 @@
 package de.hock.mqtt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,7 +13,11 @@ import de.hock.mqtt.template.MqttConnectedSystemTemplate;
 import org.junit.jupiter.api.Test;
 
 /**
- * The four configuration rules 1.0.6 demoted from design time to run time, each still covered.
+ * The seven configuration rules the validator enforces at run time, each covered.
+ *
+ * <p>Rules 1–4 are the ones 1.0.6 demoted from design time; rules 5–7 are the TLS rules added at
+ * 1.0.7. The TLS tests also assert that no message echoes any part of the certificate field, which
+ * is a policy requirement rather than a nicety.
  *
  * <p>Until 1.0.5 these rules attached messages to field paths and were tested by reading them back
  * through {@code getErrorsAtPath}. Appian turned out to discard those messages, so the rules now
@@ -148,5 +153,97 @@ class ConnectionConfigValidatorTest {
 
     assertEquals(
         65535, ConnectionConfigValidator.PORT_MAX, "the documented port ceiling must not drift");
+  }
+
+  /**
+   * Rule 5: a CA certificate configured while TLS is off is reported rather than silently ignored.
+   *
+   * <p>This is the judgement call of the 1.0.7 release, argued in
+   * {@link ConnectionConfigValidator#firstError}: a configured-but-inert field is the trap 1.0.3's
+   * {@code maxReconnectAttempts} set, and Appian gives no warning channel to use instead.
+   */
+  @Test
+  void aCaCertificateWithTlsDisabledIsReported() throws Exception {
+    String caPem = CertificateFixtures.toPem(CertificateFixtures.newCa("Test MQTT CA").certificate());
+
+    // TLS explicitly off.
+    PropertyState tlsOff = validState();
+    withValue(tlsOff, MqttConnectedSystemTemplate.TLS_ENABLED, Boolean.FALSE);
+    withValue(tlsOff, MqttConnectedSystemTemplate.CA_CERTIFICATE, caPem);
+    String offError = ConnectionConfigValidator.firstError(tlsOff);
+    assertNotNull(offError, "a CA with TLS off must be reported");
+    assertTrue(offError.contains("CA certificate"), offError);
+    assertTrue(offError.contains("TLS is disabled"), offError);
+
+    // TLS never set at all — the same inert configuration, reached a different way.
+    PropertyState tlsAbsent = validState();
+    withValue(tlsAbsent, MqttConnectedSystemTemplate.CA_CERTIFICATE, caPem);
+    String absentError = ConnectionConfigValidator.firstError(tlsAbsent);
+    assertNotNull(absentError, "an absent TLS flag is still TLS off");
+    assertTrue(absentError.contains("TLS is disabled"), absentError);
+
+    // The control case: the same certificate with TLS on is a perfectly good configuration.
+    PropertyState tlsOn = validState();
+    withValue(tlsOn, MqttConnectedSystemTemplate.TLS_ENABLED, Boolean.TRUE);
+    withValue(tlsOn, MqttConnectedSystemTemplate.CA_CERTIFICATE, caPem);
+    assertNull(
+        ConnectionConfigValidator.firstError(tlsOn),
+        "a valid CA with TLS enabled is mode 3 and must be accepted");
+
+    // And mode 2: TLS on with no certificate at all is equally valid.
+    PropertyState modeTwo = validState();
+    withValue(modeTwo, MqttConnectedSystemTemplate.TLS_ENABLED, Boolean.TRUE);
+    assertNull(
+        ConnectionConfigValidator.firstError(modeTwo),
+        "TLS on with a blank CA is mode 2, the default trust store, and must be accepted");
+  }
+
+  /** Rules 6 and 7: a value that is not PEM, and one whose PEM body will not parse. */
+  @Test
+  void anUnparseableCaCertificateIsReported() {
+    PropertyState notPem = validState();
+    withValue(notPem, MqttConnectedSystemTemplate.TLS_ENABLED, Boolean.TRUE);
+    withValue(notPem, MqttConnectedSystemTemplate.CA_CERTIFICATE, "/opt/certs/broker-ca.crt");
+    String notPemError = ConnectionConfigValidator.firstError(notPem);
+    assertNotNull(notPemError, "a file path is not a certificate");
+    assertTrue(
+        notPemError.contains("-----BEGIN CERTIFICATE-----"),
+        "the message must name the expected header: " + notPemError);
+    assertFalse(
+        notPemError.contains("/opt/certs/broker-ca.crt"),
+        "the message must not echo the field value: " + notPemError);
+
+    PropertyState brokenBody = validState();
+    withValue(brokenBody, MqttConnectedSystemTemplate.TLS_ENABLED, Boolean.TRUE);
+    withValue(
+        brokenBody,
+        MqttConnectedSystemTemplate.CA_CERTIFICATE,
+        "-----BEGIN CERTIFICATE-----\nd2hvbGx5IGJvZ3VzIGJ5dGVz!!!\n-----END CERTIFICATE-----\n");
+    String brokenError = ConnectionConfigValidator.firstError(brokenBody);
+    assertNotNull(brokenError, "a header with an unreadable body must be reported");
+    assertTrue(brokenError.contains("could not be parsed"), brokenError);
+    assertFalse(
+        brokenError.contains("d2hvbGx5"),
+        "the message must not echo the pasted body: " + brokenError);
+  }
+
+  /**
+   * Rule 6's document-id clause: a bare number is named as a probable Appian document id, and the
+   * digits themselves are not repeated.
+   *
+   * <p>That shape is exactly what the 1.0.3 design produced — a document field whose id reached the
+   * configuration as a number and never resolved to any bytes — so it is worth diagnosing by name
+   * rather than letting a crypto exception surface.
+   */
+  @Test
+  void aBareNumberCaCertificateIsReportedAsAProbableDocumentId() {
+    PropertyState documentId = validState();
+    withValue(documentId, MqttConnectedSystemTemplate.TLS_ENABLED, Boolean.TRUE);
+    withValue(documentId, MqttConnectedSystemTemplate.CA_CERTIFICATE, "279401");
+
+    String error = ConnectionConfigValidator.firstError(documentId);
+    assertNotNull(error, "a bare number must be reported");
+    assertTrue(error.contains("document id"), "the message must name a document id: " + error);
+    assertFalse(error.contains("279401"), "the message must not repeat the digits: " + error);
   }
 }

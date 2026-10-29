@@ -1,16 +1,19 @@
 # MQTT Broker Connected System
 
-**Version `1.0.6` adds the Subscribe (READ) integration and moves configuration validation to run
-time.** Two changes:
+**Version `1.0.7` adds server-side TLS.** The connected system gains two fields — **Enable TLS**
+and **CA Certificate** — taking it from nine to **eleven**, and the broker URI switches from
+`tcp://` to `ssl://` when TLS is on. Three connection modes are supported: plain TCP, TLS against
+the Appian server's own trusted certificate authorities, and TLS against a single pasted CA. See
+[TLS](#tls).
 
-- **`MqttSubscribeIntegration` — Subscribe to MQTT Topics.** Collects messages from one topic
-  filter within bounded count and time limits. See
-  [Using the Subscribe integration](#using-the-subscribe-integration), and read the
-  [blocking-wait caveat](#the-blocking-wait-caveat) before you raise `maxWaitSeconds`.
-- **`ConfigValidator` is gone.** `1.0.5` proved on a live instance that Appian discards design-time
-  errors attached to a connected system, which made that class dead code. Its rules now run at
-  invocation time in `de.hock.mqtt.ConnectionConfigValidator`, and a brand-new connected system
-  opens clean. See [Design-time validation](#design-time-validation-the-probe-is-finished).
+Two things worth reading before you enable it:
+
+- **Hostname verification works, and that is a measured result, not an assumption.** Paho 1.2.5
+  applies `HTTPS` endpoint identification to the `ssl://` socket before the handshake, so a broker
+  certificate whose subject alternative name does not match the configured host is rejected. The
+  evidence and the residual risks are in [Hostname verification](#hostname-verification).
+- **Mutual TLS is deliberately not supported.** The plug-in verifies the broker; it presents no
+  client certificate of its own. A broker that requires one will fail the handshake.
 
 ### How we got here, briefly
 
@@ -21,13 +24,21 @@ a **Connected System configuration page renders**, and **one integration can act
 `1.0.5` added four session fields — `connectionTimeoutSeconds`, `keepAliveSeconds`, `cleanSession`,
 `autoReconnectEnabled`, bringing the connected system to **nine** fields, every one of which reaches
 `MqttConnectOptions` — plus the design-time validation probe whose negative answer `1.0.6` acts on.
-Both deployed and worked. The connected system is **unchanged** at nine fields in `1.0.6`.
+Both deployed and worked. The connected system was unchanged at nine fields in `1.0.6`, which added
+the subscribe integration. `1.0.7` takes it to **eleven** with the two server-side TLS fields.
 
 ## What is still deliberately removed
 
-- **TLS and certificates** — `tlsEnabled`, `caCertificate`, `clientCertificate`,
-  `clientPrivateKey`, `keyPassphrase`, the trust/key-manager construction and the `SSLContext`
-  wiring. This build speaks plain `tcp://` only.
+- **Mutual TLS** — `clientCertificate`, `clientPrivateKey`, `keyPassphrase` and the key-manager
+  wiring. Server-side TLS ships in `1.0.7`; presenting a *client* certificate does not. The `1.0.3`
+  versions of those fields are a cautionary reference rather than a basis, because that TLS code
+  carried **three** defects, two recorded at the time and one found while planning this release:
+  the runtime chain only ever consumed `byte[]` and never resolved an Appian document id into
+  bytes, so a configured certificate could never reach the socket factory; a supplied passphrase
+  could not actually unlock a private key; and its `TlsVersionConstrainingSocketFactory` overrode
+  six `createSocket` overloads but **not** the no-argument one, which is the only one Paho calls —
+  so every TLS connection would have died with `SocketException: Unconnected sockets not
+  implemented`. It also wrote temporary keystore files to disk, which Appian's policy forbids.
 - **Multi-topic subscribe.** `topicFilter` takes exactly **one** filter, not a list. A list input
   would need `ListTypePropertyDescriptor`, whose builder force-sets both the expressionable modifier
   and an `EXPRESSION` display hint in its constructor and then couples the two in its own `build()`
@@ -59,11 +70,11 @@ git commit `d023a76`. See
 ## Facts
 
 - **Plug-in key:** `de.hock.mqtt`
-- **Version:** `1.0.6` (manifest `<plugin-info><version>`, three-part `x.y.z`)
+- **Version:** `1.0.7` (manifest `<plugin-info><version>`, three-part `x.y.z`)
 - **Minimum Appian version:** `26.9.0.0`
 - **Vendor:** Hock, <https://itondemand.com>
 
-The plug-in key and all three module keys are unchanged from `1.0.3`, and `1.0.6 > 1.0.5`, so this
+The plug-in key and all three module keys are unchanged from `1.0.3`, and `1.0.7 > 1.0.6`, so this
 build **replaces** the installed plug-in rather than installing alongside it.
 
 ## What this plug-in provides
@@ -97,7 +108,7 @@ That `Call Integration` node is part of the Appian platform, not something this 
 
 - Appian **26.9** (manifest sets `<application-version min="26.9.0.0"/>`)
 - **Java 17** to build (`maven.compiler.release` is `17`)
-- A reachable **MQTT broker** speaking MQTT 3.1.1 over **plain TCP** — there is no TLS in this build
+- A reachable **MQTT broker** speaking MQTT 3.1.1 over plain TCP or TLS
 - `com.appian:connected-systems-core:1.9.1`, Maven scope `provided` — supplied by the Appian
   runtime, never bundled
 - `com.appian:connected-systems-client:1.3.0`, Maven scope `provided` — the `Simple*` template
@@ -114,13 +125,13 @@ mvn clean package
 The deployment artifact is:
 
 ```
-target/mqtt-broker-connected-system-1.0.6-plugin.jar
+target/mqtt-broker-connected-system-1.0.7-plugin.jar
 ```
 
 The `-plugin` suffix comes from the assembly `<id>`; a jar without it is a stale build. Exactly one
 jar is produced by design — the default `maven-jar-plugin` execution is bound to phase `none`, so
-there is no second archive that also looks deployable. The jar carries the plug-in's **seven `.java`
-sources** alongside the compiled classes (an AppMarket requirement), `appian-plugin.xml` at the
+there is no second archive that also looks deployable. The jar carries the plug-in's **eight
+`.java` sources** alongside the compiled classes (an AppMarket requirement), `appian-plugin.xml` at the
 archive root, and Paho as a nested jar under `META-INF/lib/`.
 
 ## Deploy
@@ -128,7 +139,7 @@ archive root, and Paho as a nested jar under `META-INF/lib/`.
 Copy the jar into the plug-ins directory of the Appian installation:
 
 ```bash
-cp target/mqtt-broker-connected-system-1.0.6-plugin.jar APPIAN_INSTALL/_admin/plugins/
+cp target/mqtt-broker-connected-system-1.0.7-plugin.jar APPIAN_INSTALL/_admin/plugins/
 ```
 
 Hot deployment is governed by the `conf.plugins.poll-interval` custom property (seconds). When it is
@@ -137,9 +148,9 @@ See [Appian Suite Plug-ins](https://docs.appian.com/suite/help/26.9/Appian_Plug-
 
 Confirm the deployment three ways:
 
-- The **Admin Console → Plug-ins** page lists the plug-in at version `1.0.6`.
+- The **Admin Console → Plug-ins** page lists the plug-in at version `1.0.7`.
 - **New > Connected System** in Appian Designer offers the **MQTT Broker** type **and the form
-  renders nine fields**. This is the check the three releases before `1.0.4` failed.
+  renders eleven fields**. This is the check the three releases before `1.0.4` failed.
 - **New > Integration** against that connected system offers **both** **Publish MQTT Message** and
   **Subscribe to MQTT Topics**.
 - `tomcat-stdOut.log` shows a `Successfully installed Plug-in` line plus
@@ -147,7 +158,7 @@ Confirm the deployment three ways:
 
 ## Configuring the Connected System
 
-Create a Connected System object and pick the **MQTT Broker** template. The nine fields below are
+Create a Connected System object and pick the **MQTT Broker** template. The eleven fields below are
 the whole configuration surface, listed in the order the template renders them. Keys are the
 constants on `de.hock.mqtt.template.MqttConnectedSystemTemplate`; labels are from
 `resources_en_US.properties`.
@@ -156,6 +167,8 @@ constants on `de.hock.mqtt.template.MqttConnectedSystemTemplate`; labels are fro
 |---|---|---|---|---|---|
 | Broker Host | `brokerHost` | Text | Yes | — | Required; non-blank after trimming |
 | Broker Port | `brokerPort` | Integer | Yes | — | Required; `1`–`65535`. Placeholder suggests `1883` |
+| Enable TLS | `tlsEnabled` | Boolean | No | **`false`** | None |
+| CA Certificate | `caCertificate` | Paragraph | No | Blank — the Appian server's own trusted CAs | Must be PEM when TLS is on; rejected outright when TLS is off. See [TLS](#tls) |
 | Client Identifier | `clientIdentifier` | Text | No | Paho's `generateClientId()` | None |
 | Username | `username` | Text | No | Anonymous connection | None |
 | Password | `password` | Encrypted text, masked | No | Anonymous connection | None |
@@ -204,6 +217,128 @@ inputs** instead.
 pre-filled. Actually seeding a value would need a first-render signal to avoid overwriting what you
 type on every re-render, and that machinery is deliberately absent.
 
+**An existing connected system keeps working untouched.** A configuration saved by `1.0.6`, before
+the two TLS fields existed, carries no value for either, and an absent `tlsEnabled` is read as
+`false` — so it continues to connect over plain `tcp://` exactly as it did.
+
+## TLS
+
+Server-side TLS, added in `1.0.7`. The plug-in verifies the broker. It does **not** present a client
+certificate, so mutual TLS is unsupported — see [Mutual TLS](#mutual-tls-is-not-supported).
+
+### The two fields, and why the certificate is pasted text
+
+| Label | Key | Type | Meaning |
+|---|---|---|---|
+| Enable TLS | `tlsEnabled` | Boolean | Connect over `ssl://` instead of `tcp://`. Off by default |
+| CA Certificate | `caCertificate` | Paragraph | Optional PEM-encoded CA certificate. Blank means the Appian server's own trusted CAs |
+
+**You paste PEM text; there is no file upload, and there cannot be one.** A connected system
+template may not declare an expressionable property descriptor — Appian rejects the entire
+descriptor set at conversion time and the configuration page then fails to render. The SDK's
+`DocumentPropertyDescriptor` *force-sets* that flag in its builder constructor and its
+`Guard.checkPropertyIsExpressionable` refuses to build with it cleared, so **no document-upload
+field exists on a connected system template with this SDK**. `1.0.3` tried it and the deploy failed.
+`ParagraphPropertyDescriptor` is the only multi-line text input available, which is why the
+certificate arrives as pasted text.
+
+Paste the **whole** PEM block, BEGIN and END lines included. A chain of several concatenated blocks
+is accepted, and every certificate in it becomes a trust anchor. Windows line endings and
+surrounding whitespace are tolerated.
+
+### The three connection modes
+
+| Mode | Enable TLS | CA Certificate | URI | Trust anchors | Use it when |
+|---|---|---|---|---|---|
+| 1 | off | *(must be blank)* | `tcp://host:port` | none | Plain MQTT on a trusted network. The default, and unchanged from `1.0.6` |
+| 2 | on | blank | `ssl://host:port` | The Appian server's trusted CAs | The broker has a **publicly trusted** certificate — HiveMQ Cloud and similar. Do not paste a CA you do not need |
+| 3 | on | PEM | `ssl://host:port` | **Only** the pasted certificate(s) | The broker is **self-signed or uses a private CA**. Paste the CA that signed the broker certificate; a self-signed broker certificate is its own CA and works |
+
+Mode 2 reads the trust store the Appian server's JVM is configured with. A broker whose CA is
+publicly trusted in general but absent from *that* store will fail in mode 2 and succeed in mode 3 —
+which is one of the reasons mode 3 exists.
+
+### The port is yours to set
+
+**1883** is the convention for plain TCP and **8883** for TLS, and **the plug-in never changes the
+port when you tick the checkbox.** A `tcp` port left behind after enabling TLS is the single
+commonest cause of a failed TLS connection.
+
+### Hostname verification
+
+**It happens, and the broker's host name is genuinely checked.** This is a measured result, not a
+reading of documentation.
+
+Paho 1.2.5's `ssl://` transport (`SSLNetworkModuleFactory`, whose supported scheme set is exactly
+`{"ssl"}`) copies `MqttConnectOptions.isHttpsHostnameVerificationEnabled()` onto its network module;
+that field is seeded **`true`** in the `MqttConnectOptions` constructor; and `SSLNetworkModule.start()`
+applies `SSLParameters.setEndpointIdentificationAlgorithm("HTTPS")` to the socket after `connect`
+and before `startHandshake()`. The plug-in sets that flag **explicitly** rather than relying on a
+library default it cannot see. Two offline tests confirm the behaviour end to end against a loopback
+TLS server: a certificate whose subject alternative name matches the connected host completes the
+handshake, and one for a different host is **rejected**.
+
+So in modes 2 and 3 the guarantee is the full one: *the broker presents a certificate chain the
+configured trust anchor signed, whose subject alternative name matches the host you configured.*
+Not merely "encrypted", and not merely "signed by somebody".
+
+**The residual risks, stated plainly:**
+
+- **Verification matches the host string as typed.** If you configure the broker by **IP address**,
+  the certificate must carry that IP in its subject alternative name. Prefer a host name.
+- **In mode 2, any CA the Appian server trusts can vouch for the host.** That is the ordinary web
+  PKI trust model, and it is the right trade-off for a publicly trusted broker. Mode 3 narrows trust
+  to one CA when that matters.
+- **There is deliberately no way to turn verification off.** No "trust all certificates" option, no
+  permissive trust manager, not behind a flag. Mode 3 already covers self-signed brokers properly by
+  trusting the specific certificate, so the escape hatch has no legitimate use and would be a
+  security footgun.
+
+### Mutual TLS is not supported
+
+The plug-in presents no client certificate. A broker configured to **require** one will fail the
+handshake. Client-certificate authentication is planned for a later release; username and password
+over TLS works today.
+
+### What a failure looks like
+
+Configuration problems are caught before any socket is opened and come back as `Invalid
+configuration`:
+
+| What you did | Message |
+|---|---|
+| Pasted a CA but left TLS off | "A CA certificate is configured but TLS is disabled on the MQTT Broker connected system. Enable TLS, or clear the CA Certificate field." |
+| Pasted something that is not PEM | "…is not a PEM certificate. It must start with `-----BEGIN CERTIFICATE-----`…" |
+| Pasted a bare number | the same, plus "The configured value looks like an Appian document id." |
+| Pasted a PEM block that will not parse | "…could not be parsed as an X.509 certificate. Check that the whole PEM block was pasted…" |
+
+**No error message ever contains any part of the certificate field**, by policy and by test.
+
+Handshake failures surface through the normal `MQTT publish failed` / `MQTT subscribe failed` error
+carrying Paho's own wording. The two worth recognising:
+
+- `unable to find valid certification path to requested target` — the CA is **wrong or missing**.
+  In mode 2, the Appian server does not trust the broker's CA; switch to mode 3 and paste it.
+- `No subject alternative DNS name matching <host> found` — the certificate is for a different host.
+  That is hostname verification doing its job.
+
+**The hard error on a stale CA is a deliberate trade-off.** If you untick **Enable TLS** to test a
+plain connection while leaving a certificate pasted, both integrations fail until you clear the
+field. Failing loudly beats the alternative: a field that is configured, visible, and silently
+ignored — which is exactly the trap `1.0.3`'s unenforced `maxReconnectAttempts` set.
+
+### What the plug-in does not do with TLS
+
+- **No `System.setProperty`, ever.** The usual shortcut for MQTT-over-TLS is to set
+  `javax.net.ssl.*` trust-store properties. That mutates JVM-global state, which Appian's plug-in
+  policies forbid, and it would change TLS behaviour for every other plug-in on the server. The
+  trust material is assembled in memory and handed to Paho as a socket factory instead.
+- **No temporary keystore file.** Nothing is written to the filesystem — also forbidden by policy,
+  and also something the `1.0.3` code did.
+- **No pinned protocol version.** `SSLContext.getInstance("TLS")` lets the JDK negotiate its best
+  available; on Java 17 that is TLS 1.3 and 1.2, with 1.0 and 1.1 already disabled by the platform.
+  `1.0.3` pinned `TLSv1.2`, which would have *excluded* TLS 1.3.
+
 ### Design-time validation: the probe is finished
 
 `1.0.5` validated the configuration on **every render, including the very first one**, attaching
@@ -232,6 +367,9 @@ any broker contact:
 | `brokerPort` present and `1`–`65535` | `Invalid configuration`, naming the offending value |
 | `connectionTimeoutSeconds`, when supplied, `1`–`300` | `Invalid configuration`, naming the offending value |
 | `keepAliveSeconds`, when supplied, `0`–`65535` | `Invalid configuration`, naming the offending value |
+| `caCertificate` must be blank when `tlsEnabled` is off | `Invalid configuration` — "A CA certificate is configured but TLS is disabled…" |
+| `caCertificate`, when TLS is on, must contain the PEM header | `Invalid configuration`, naming `-----BEGIN CERTIFICATE-----`, plus an Appian-document-id hint for a bare number |
+| `caCertificate`, when TLS is on, must parse as X.509 | `Invalid configuration` — "…could not be parsed as an X.509 certificate…" |
 
 So a misconfigured connected system produces a readable integration error instead of an obscure Paho
 exception. What this means for anyone working on the plug-in:
@@ -452,9 +590,12 @@ Specifically:
   blocked and a flood of traffic cannot grow memory — the overflow is dropped. Unsubscribe,
   disconnect and close all run in a `finally` block, on every path including a timeout or an
   exception.
-- **Plain `tcp://` only.** No `ssl://`, no `SSLContext`, no socket factory, and no
-  `System.setProperty` call anywhere — Appian's plug-in policies forbid JVM-global mutation, which
-  is the usual shortcut for MQTT-over-TLS.
+- **`tcp://` when TLS is off, `ssl://` when it is on.** The TLS trust material is built as an
+  in-memory `SSLContext` and handed to Paho through `MqttConnectOptions.setSocketFactory`, from the
+  shared `buildConnectOptions` so neither call site can forget it. There is still no
+  `System.setProperty` call anywhere, still no temporary keystore, and still nothing written to the
+  filesystem — Appian's plug-in policies forbid JVM-global mutation and direct filesystem access,
+  and those two bans are exactly what rule out the usual MQTT-over-TLS shortcuts. See [TLS](#tls).
 - `MemoryPersistence` rather than Paho's default file persistence, so nothing is written to the
   filesystem.
 - The client is disconnected and closed in a `finally` block, so a failed publish or subscribe never
@@ -468,22 +609,39 @@ response, which is where a Designer sees it.
 
 - **A subscribe blocks an Appian request thread for its whole wait**, and Appian's own integration
   timeout may fire first. See [the blocking-wait caveat](#the-blocking-wait-caveat).
-- **Automated test coverage is offline only — 23 tests in seven classes.** No test needs a broker or
-  an Appian runtime.
+- **Automated test coverage is offline only — 35 tests in nine classes.** No test needs a broker, an
+  Appian runtime, or a network route off the machine; two bind an ephemeral loopback port on
+  `127.0.0.1`.
   - `src/test/java/de/hock/mqtt/ProjectStructureTest.java` (2) — `appian-plugin.xml` and
     `resources_en_US.properties` are on the classpath.
-  - `src/test/java/de/hock/mqtt/template/MqttConnectedSystemTemplateDescriptorTest.java` (7) —
+  - `src/test/java/de/hock/mqtt/template/MqttConnectedSystemTemplateDescriptorTest.java` (8) —
     drives all three templates' configuration descriptors: a non-null root state with a resolvable
-    root type, exactly the nine expected field keys in order, that no connected system descriptor
+    root type, exactly the eleven expected field keys in order, that no connected system descriptor
     reads back expressionable, that no connected system field uses a List/Document/AppianValue
-    descriptor type, that the publish integration renders its three inputs all expressionable, and
+    descriptor type, that the two TLS fields use Boolean and Paragraph descriptors and neither is
+    expressionable, that the publish integration renders its three inputs all expressionable, and
     the same two checks for the subscribe integration's four inputs.
   - `src/test/java/de/hock/mqtt/template/MqttConnectedSystemTemplateNoDesignTimeErrorsTest.java` (1)
-    — a brand-new connected system renders with no error on any of the nine fields and none on the
-    root, which is the intended `1.0.6` behaviour.
-  - `src/test/java/de/hock/mqtt/ConnectionConfigValidatorTest.java` (4) — one test per demoted rule
-    on the run-time path: broker host, broker port, the two session ranges (with keep-alive `0`
-    accepted as a legal disable), and a valid configuration with blank optionals reporting nothing.
+    — a brand-new connected system renders with no error on any of the eleven fields and none on the
+    root, which is the intended behaviour since `1.0.6`.
+  - `src/test/java/de/hock/mqtt/ConnectionConfigValidatorTest.java` (7) — one test per run-time
+    rule: broker host, broker port, the two session ranges (with keep-alive `0` accepted as a legal
+    disable), a valid configuration with blank optionals reporting nothing, and the three TLS rules
+    — a CA with TLS off, an unparseable CA, and a bare number diagnosed as a probable Appian
+    document id. Each TLS test also asserts the message echoes no part of the field.
+  - `src/test/java/de/hock/mqtt/TlsSupportTest.java` (5) — the three connection modes, a
+    multi-certificate PEM chain, and malformed input rejected without echoing its content. The
+    mode-3 test is the one that matters: it reads the trust manager back and asserts a certificate
+    the configured CA signed is **accepted** while an unrelated one is **rejected**, which is the
+    only offline proof that trust is restricted rather than merely configured.
+  - `src/test/java/de/hock/mqtt/TlsHostnameVerificationTest.java` (3) — Paho's hostname-verification
+    flag defaults on and the plug-in sets it explicitly, plus two real handshakes against a loopback
+    `SSLServerSocket` replicating Paho's exact socket sequence: a matching subject alternative name
+    completes, a mismatched one fails.
+  - `src/test/java/de/hock/mqtt/CertificateFixtures.java` — not a test class. Generates throwaway
+    CAs, leaf certificates and PEM at run time by hand-writing X.509 DER and signing it with
+    `java.security.Signature`, because no public JDK API creates a certificate. **No key material,
+    keystore or passphrase is committed**, and nothing is written to disk.
   - `src/test/java/de/hock/mqtt/MqttPublisherConnectOptionsTest.java` (2) — each of the four session
     settings reaching `MqttConnectOptions`, and the documented defaults for absent and out-of-range
     values.
@@ -530,7 +688,7 @@ git show d023a76:src/main/java/de/hock/mqtt/validation/InputValidator.java
 Restore selectively — the TLS layer, or the multi-topic subscribe inputs — rather than wholesale,
 and re-read [the steering file](.kiro/steering/appian-appmarket-compliance.md) first: the three
 platform contracts that broke `1.0.1`–`1.0.3` still apply to anything you put back, and the version
-must be bumped past `1.0.6`. Note that `1.0.3`'s subscribe integration carried the sticky-error
+must be bumped past `1.0.7`. Note that `1.0.3`'s subscribe integration carried the sticky-error
 defect and the removed adapter indirection; `1.0.6`'s is a fresh implementation that reuses only its
 collection semantics.
 
@@ -544,10 +702,14 @@ Paho is dual-licensed under EPL-2.0 and EDL-1.0; redistribution here relies on t
 
 ## Links
 
-- [.agents/tasks/subscribe-integration-1.0.6.md](.agents/tasks/subscribe-integration-1.0.6.md) —
-  **the `1.0.6` release record, and the place to start**: every decision behind the subscribe
-  integration and the validator demotion, the full verification output, and the deploy-and-test
+- [.agents/tasks/server-side-tls-1.0.7.md](.agents/tasks/server-side-tls-1.0.7.md) —
+  **the `1.0.7` release record, and the place to start**: the two TLS fields and three modes, the
+  hostname-verification finding with its bytecode evidence and the no-wrapper decision, the three
+  `1.0.3` TLS defects, the validator rules, the full verification output, and the deploy-and-test
   checklist.
+- [.agents/tasks/subscribe-integration-1.0.6.md](.agents/tasks/subscribe-integration-1.0.6.md) —
+  the `1.0.6` release record: every decision behind the subscribe integration and the validator
+  demotion, the full verification output, and the deploy-and-test checklist.
 - [.agents/tasks/validation-and-config-fields-1.0.5.md](.agents/tasks/validation-and-config-fields-1.0.5.md)
   — the `1.0.5` release record: the ungated-probe decision, the error-clearing fix with its `javap`
   evidence, the full verification output, and the deploy-and-test checklist.

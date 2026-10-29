@@ -15,6 +15,7 @@ import com.appian.connectedsystems.templateframework.sdk.metadata.IntegrationTem
 import de.hock.mqtt.ConnectionConfigValidator;
 import de.hock.mqtt.MqttSubscriber;
 import de.hock.mqtt.template.MqttConnectedSystemTemplate;
+import java.security.GeneralSecurityException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,6 +187,12 @@ public class MqttSubscribeIntegration extends SimpleIntegrationTemplate {
         MqttConnectedSystemTemplate.textValue(connection, MqttConnectedSystemTemplate.BROKER_HOST);
     int brokerPort =
         MqttConnectedSystemTemplate.intValue(connection, MqttConnectedSystemTemplate.BROKER_PORT, 0);
+    Boolean tlsEnabled =
+        MqttConnectedSystemTemplate.booleanValue(
+            connection, MqttConnectedSystemTemplate.TLS_ENABLED);
+    String caCertificate =
+        MqttConnectedSystemTemplate.textValue(
+            connection, MqttConnectedSystemTemplate.CA_CERTIFICATE);
     String clientIdentifier =
         MqttConnectedSystemTemplate.textValue(
             connection, MqttConnectedSystemTemplate.CLIENT_IDENTIFIER);
@@ -214,6 +221,8 @@ public class MqttSubscribeIntegration extends SimpleIntegrationTemplate {
           MqttSubscriber.subscribe(
               brokerHost,
               brokerPort,
+              tlsEnabled,
+              caCertificate,
               clientIdentifier,
               username,
               password,
@@ -225,6 +234,13 @@ public class MqttSubscribeIntegration extends SimpleIntegrationTemplate {
               keepAliveSeconds,
               cleanSession,
               autoReconnectEnabled);
+    } catch (GeneralSecurityException e) {
+      // Fixed message, deliberately: never let a crypto exception's text reach a response, in case a
+      // future JDK starts quoting its input. Unparseable PEM was already rejected by the validator.
+      return error(
+          "Invalid configuration",
+          "The TLS configuration of the MQTT Broker connected system could not be applied."
+              + " Check the CA Certificate field.");
     } catch (MqttException | RuntimeException e) {
       return error(
           "MQTT subscribe failed",

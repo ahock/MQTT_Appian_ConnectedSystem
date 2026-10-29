@@ -1,14 +1,16 @@
 # MQTT Broker Connected System — Plug-in Guide
 
 > **⚠️ This guide describes the pre-reduction FULL build (1.0.x).** The plug-in that currently ships
-> is **1.0.6**: one connected system with nine fields (`brokerHost`, `brokerPort`,
-> `clientIdentifier`, `username`, `password`, `connectionTimeoutSeconds`, `keepAliveSeconds`,
-> `cleanSession`, `autoReconnectEnabled`), one publish integration with three inputs (`topic`,
-> `payload`, `qos`) and one subscribe integration with four (`topicFilter`, `qos`,
+> is **1.0.7**: one connected system with eleven fields (`brokerHost`, `brokerPort`, `tlsEnabled`,
+> `caCertificate`, `clientIdentifier`, `username`, `password`, `connectionTimeoutSeconds`,
+> `keepAliveSeconds`, `cleanSession`, `autoReconnectEnabled`), one publish integration with three
+> inputs (`topic`, `payload`, `qos`) and one subscribe integration with four (`topicFilter`, `qos`,
 > `maxWaitSeconds`, `maxMessageCount`). Subscribe **does** ship again as of 1.0.6, but in a narrower
 > shape than described below — see the note under [Subscribe to MQTT Topics](#subscribe-to-mqtt-topics).
-> TLS and certificates, Last Will and Testament, reconnect attempt tuning and diagnostics are **not
-> present**. Design-time validation is **gone**: 1.0.5 ran it ungated as a probe and the answer,
+> **Server-side** TLS ships as of 1.0.7 (`tlsEnabled`, `caCertificate`), but the mutual-TLS fields
+> this guide describes below (`clientCertificate`, `clientPrivateKey`, `keyPassphrase`) do **not**
+> exist; Last Will, reconnect attempt tuning and diagnostics remain absent. Design-time validation
+> is **gone**: 1.0.5 ran it ungated as a probe and the answer,
 > observed on a live instance, was that Appian discards connected system field errors, so 1.0.6
 > moved those rules to run time inside the integrations. Both the gated behaviour this guide
 > describes below ("A brand-new Connected System opens clean with no validation messages", near line
@@ -93,6 +95,14 @@ Create a **Connected System** object and choose the **MQTT Broker** template. Fi
 | Client Certificate | For mutual TLS (optional). |
 | Client Private Key | **Encrypted & masked.** Required alongside a client certificate for mutual TLS. |
 | Key Passphrase | **Encrypted & masked.** Optional. |
+
+> **What actually ships as of 1.0.7.** The first two rows exist, in a different shape: **Enable
+> TLS** is a Boolean and **CA Certificate** is a multi-line text field holding pasted PEM, not a
+> document upload — no document-upload field can exist on a connected system with this SDK. The
+> protocol is not pinned to TLS 1.2; the JDK negotiates, which on Java 17 means TLS 1.3 or 1.2. The
+> three client rows do **not** exist: mutual TLS is unsupported. See
+> [README.md § TLS](../README.md#tls) for the three connection modes and the
+> hostname-verification finding.
 
 ### Reconnection
 | Field | Notes |

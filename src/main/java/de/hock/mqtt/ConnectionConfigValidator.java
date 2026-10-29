@@ -2,6 +2,7 @@ package de.hock.mqtt;
 
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyState;
 import de.hock.mqtt.template.MqttConnectedSystemTemplate;
+import java.security.GeneralSecurityException;
 
 /**
  * Run-time validation of the MQTT Broker connected system configuration, shared by both
@@ -56,6 +57,12 @@ public final class ConnectionConfigValidator {
   /** Highest accepted keep-alive interval, in seconds — the MQTT protocol's own 16-bit ceiling. */
   static final int KEEP_ALIVE_MAX = 65535;
 
+  /**
+   * The PEM header a pasted certificate must contain, shared with {@link TlsSupport} so the
+   * validator's idea of "is this even PEM" cannot drift from the parser's.
+   */
+  static final String PEM_HEADER = TlsSupport.PEM_CERTIFICATE_HEADER;
+
   private ConnectionConfigValidator() {
     // Utility class: no instances.
   }
@@ -72,12 +79,28 @@ public final class ConnectionConfigValidator {
    *       #TIMEOUT_MAX} seconds.
    *   <li>{@code keepAliveSeconds} — optional; when supplied, {@value #KEEP_ALIVE_MIN}–{@value
    *       #KEEP_ALIVE_MAX} seconds, where {@code 0} disables MQTT keep-alive.
+   *   <li>{@code caCertificate} supplied while {@code tlsEnabled} is off — reported, see below.
+   *   <li>{@code caCertificate} that is not PEM at all — reported, naming the expected header, and
+   *       naming an Appian document id as the likely mistake when the value is a bare number.
+   *   <li>{@code caCertificate} that has the header but will not parse — reported.
    * </ul>
+   *
+   * <p><strong>Rule 5 is a hard error, deliberately.</strong> A CA certificate pasted while TLS is
+   * off is configured but inert, and this project has already condemned exactly that shape once: the
+   * 1.0.3 {@code maxReconnectAttempts} field that nothing enforced. Appian offers no design-time
+   * warning channel on a connected system (its field errors are discarded, measured on a live
+   * instance) and a success response has no warning slot, so failing the call is the only way to
+   * tell a designer. The cost is real and worth stating: unchecking <em>Enable TLS</em> to test a
+   * plain connection also means clearing the certificate field, and until it is cleared both
+   * integrations fail. That is a visible, self-explaining, one-field fix rather than a silent
+   * misconfiguration.
    *
    * <p>{@code clientIdentifier}, {@code username}, {@code password}, {@code cleanSession} and
    * {@code autoReconnectEnabled} are optional and unvalidated. A {@code null} state is reported as a
    * missing broker host, which is the honest description of a connected system that carries no
    * configuration at all.
+   *
+   * <p>No message returned here contains any part of the certificate field's contents.
    *
    * @param connectionState the root state of the connected system configuration; {@code null} is
    *     tolerated
@@ -133,6 +156,49 @@ public final class ConnectionConfigValidator {
           + " seconds on the MQTT Broker connected system, but was "
           + keepAliveSeconds
           + ".";
+    }
+
+    Boolean tlsEnabled =
+        MqttConnectedSystemTemplate.booleanValue(
+            connectionState, MqttConnectedSystemTemplate.TLS_ENABLED);
+    String caCertificate =
+        MqttConnectedSystemTemplate.textValue(
+            connectionState, MqttConnectedSystemTemplate.CA_CERTIFICATE);
+    boolean hasCa = caCertificate != null && !caCertificate.isBlank();
+
+    if (!hasCa) {
+      return null;
+    }
+
+    // Rule 5: configured but inert. See the judgement recorded in this method's documentation.
+    if (!TlsSupport.isTlsEnabled(tlsEnabled)) {
+      return "A CA certificate is configured but TLS is disabled on the MQTT Broker connected"
+          + " system. Enable TLS, or clear the CA Certificate field.";
+    }
+
+    // Rule 6: not PEM at all. A bare number is the stale-Appian-document-id mistake the 1.0.3
+    // design produced, and is worth naming explicitly — without repeating the digits.
+    if (!caCertificate.contains(PEM_HEADER)) {
+      String message =
+          "The CA Certificate on the MQTT Broker connected system is not a PEM certificate. It must"
+              + " start with "
+              + PEM_HEADER
+              + " and end with -----END CERTIFICATE-----. Paste the certificate text itself, not a"
+              + " document id, a file name or a path.";
+      if (caCertificate.trim().matches("\\d{1,20}")) {
+        message += " The configured value looks like an Appian document id.";
+      }
+      return message;
+    }
+
+    // Rule 7: header present, but the body will not parse. The caught message is discarded rather
+    // than appended, so nothing from the field can reach the designer's screen.
+    try {
+      TlsSupport.parseCertificates(caCertificate);
+    } catch (GeneralSecurityException e) {
+      return "The CA Certificate on the MQTT Broker connected system could not be parsed as an"
+          + " X.509 certificate. Check that the whole PEM block was pasted, including the BEGIN and"
+          + " END lines, and that no characters were lost.";
     }
 
     return null;

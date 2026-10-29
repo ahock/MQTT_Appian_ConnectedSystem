@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.security.GeneralSecurityException;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.junit.jupiter.api.Test;
 
@@ -20,9 +21,10 @@ class MqttPublisherConnectOptionsTest {
 
   /** The no-inert-field proof: all four configured values show up on the options object. */
   @Test
-  void configuredSessionValuesReachMqttConnectOptions() {
+  void configuredSessionValuesReachMqttConnectOptions() throws GeneralSecurityException {
     MqttConnectOptions options =
-        MqttPublisher.buildConnectOptions(null, null, 17, 45, Boolean.FALSE, Boolean.TRUE);
+        MqttPublisher.buildConnectOptions(
+            Boolean.FALSE, null, null, null, 17, 45, Boolean.FALSE, Boolean.TRUE);
 
     assertEquals(17, options.getConnectionTimeout(), "connectionTimeoutSeconds must be applied");
     assertEquals(45, options.getKeepAliveInterval(), "keepAliveSeconds must be applied");
@@ -35,9 +37,10 @@ class MqttPublisherConnectOptionsTest {
    * same default rather than throwing — a mistyped keep-alive must not refuse a message.
    */
   @Test
-  void absentOrOutOfRangeSessionValuesFallBackToTheDocumentedDefaults() {
+  void absentOrOutOfRangeSessionValuesFallBackToTheDocumentedDefaults()
+      throws GeneralSecurityException {
     MqttConnectOptions absent =
-        MqttPublisher.buildConnectOptions(null, null, null, null, null, null);
+        MqttPublisher.buildConnectOptions(Boolean.FALSE, null, null, null, null, null, null, null);
 
     assertEquals(
         MqttPublisher.CONNECT_TIMEOUT_SECONDS,
@@ -51,7 +54,7 @@ class MqttPublisherConnectOptionsTest {
     assertFalse(absent.isAutomaticReconnect(), "an absent autoReconnectEnabled means false");
 
     MqttConnectOptions outOfRange =
-        MqttPublisher.buildConnectOptions(null, null, 0, -1, null, null);
+        MqttPublisher.buildConnectOptions(Boolean.FALSE, null, null, null, 0, -1, null, null);
 
     assertEquals(
         MqttPublisher.CONNECT_TIMEOUT_SECONDS,
@@ -64,7 +67,7 @@ class MqttPublisherConnectOptionsTest {
 
     // 0 is legal MQTT — it disables keep-alive — so it is in range and must pass through.
     MqttConnectOptions keepAliveDisabled =
-        MqttPublisher.buildConnectOptions(null, null, null, 0, null, null);
+        MqttPublisher.buildConnectOptions(Boolean.FALSE, null, null, null, null, 0, null, null);
 
     assertEquals(
         0,

@@ -3,7 +3,8 @@
   Appian plug-in manifest for the MQTT Broker Connected System.
 
   Registers the three runtime entry points of the plug-in:
-    * de.hock.mqtt.template.MqttConnectedSystemTemplate  - nine-field broker configuration
+    * de.hock.mqtt.template.MqttConnectedSystemTemplate  - eleven-field broker configuration,
+                                                           optional server-side TLS
     * de.hock.mqtt.integration.MqttPublishIntegration    - WRITE integration, publishes one message
     * de.hock.mqtt.integration.MqttSubscribeIntegration  - READ integration, collects messages from
                                                            one topic filter within bounded limits
@@ -24,9 +25,9 @@
 -->
 <appian-plugin name="MQTT Broker Connected System" key="de.hock.mqtt">
     <plugin-info>
-        <description>MQTT connected system: broker configuration plus two integrations, one that publishes a message to a topic and one that collects messages from a topic filter.</description>
+        <description>MQTT connected system: broker configuration, optionally over TLS, plus two integrations, one that publishes a message to a topic and one that collects messages from a topic filter.</description>
         <vendor name="Hock" url="https://itondemand.com"/>
-        <version>1.0.6</version>
+        <version>1.0.7</version>
         <application-version min="26.9.0.0"/>
     </plugin-info>
 

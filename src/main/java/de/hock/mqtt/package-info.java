@@ -19,8 +19,15 @@
  * {@code de.hock.mqtt.integration.MqttSubscribeIntegration} collects messages from one topic filter
  * within bounded count and time limits.
  *
- * <p>TLS and certificates, Last Will and Testament, multi-topic subscribe and the
- * diagnostics/redaction layer remain deliberately absent; the complete 1.0.3 source is archived at
- * git commit {@code d023a76}.
+ * <p>1.0.7 adds <strong>server-side</strong> TLS in {@link de.hock.mqtt.TlsSupport}: two new
+ * connected system fields take it to eleven, the broker URI becomes {@code ssl://} when TLS is on,
+ * and the trust material is assembled entirely in memory and handed to Paho as a socket factory —
+ * never through JVM-global settings and never through a key store on disk, both of which Appian's
+ * plug-in policies forbid. The broker's host name is verified, which was measured rather than
+ * assumed.
+ *
+ * <p><strong>Mutual</strong> TLS (a client certificate and private key), Last Will and Testament,
+ * multi-topic subscribe and the diagnostics/redaction layer remain deliberately absent; the complete
+ * 1.0.3 source is archived at git commit {@code d023a76}.
  */
 package de.hock.mqtt;

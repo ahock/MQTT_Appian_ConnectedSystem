@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -54,8 +55,14 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
  * <p>Session settings come from the connected system and are applied by
  * {@link MqttPublisher#buildConnectOptions}, shared so the default-from-{@code null} logic exists
  * once. {@link MemoryPersistence} is used because Paho's default persistence writes to the
- * filesystem, which Appian's plug-in policies forbid. Transport is plain {@code tcp://} only: no
- * TLS, no socket factory, and no JVM-global property is ever set.
+ * filesystem, which Appian's plug-in policies forbid.
+ *
+ * <p><strong>Transport.</strong> Plain {@code tcp://} when the connected system leaves TLS off,
+ * which is the default and the unchanged 1.0.6 behaviour, and {@code ssl://} when it is on. The
+ * server-side TLS configuration is built by {@link TlsSupport} and installed by the shared
+ * {@link MqttPublisher#buildConnectOptions}, so this call site cannot diverge from the publisher's.
+ * No JVM-global setting is ever mutated and nothing is written to the filesystem; Appian's plug-in
+ * policies forbid both, which is exactly why the trust material is assembled in memory.
  */
 public final class MqttSubscriber {
 
@@ -74,6 +81,10 @@ public final class MqttSubscriber {
    *
    * @param brokerHost broker host name or address
    * @param brokerPort broker TCP port
+   * @param tlsEnabled TLS flag from the connected system; {@code null} or {@code false} means plain
+   *     {@code tcp://}
+   * @param caCertificatePem PEM-encoded broker CA certificate, or {@code null}/blank for the JVM
+   *     default trust store; ignored entirely when TLS is off
    * @param clientIdentifier MQTT client identifier; a blank value falls back to Paho's own
    *     {@link MqttClient#generateClientId()}, and a configured one is suffixed with
    *     {@value #SUBSCRIBE_CLIENT_ID_SUFFIX}
@@ -94,10 +105,14 @@ public final class MqttSubscriber {
    * @return the collected messages in arrival order, each a map of {@code topic}, {@code payload},
    *     {@code qos}, {@code retained} and {@code binary}; empty when nothing arrived in the window
    * @throws MqttException if the connection or the subscription fails
+   * @throws GeneralSecurityException if TLS is enabled and the configured CA certificate cannot be
+   *     turned into a trust anchor
    */
   public static List<Map<String, Object>> subscribe(
       String brokerHost,
       int brokerPort,
+      Boolean tlsEnabled,
+      String caCertificatePem,
       String clientIdentifier,
       String username,
       char[] password,
@@ -109,7 +124,7 @@ public final class MqttSubscriber {
       Integer keepAliveSeconds,
       Boolean cleanSession,
       Boolean autoReconnectEnabled)
-      throws MqttException {
+      throws MqttException, GeneralSecurityException {
 
     String clientId =
         (clientIdentifier == null || clientIdentifier.isBlank())
@@ -118,6 +133,8 @@ public final class MqttSubscriber {
 
     MqttConnectOptions options =
         MqttPublisher.buildConnectOptions(
+            tlsEnabled,
+            caCertificatePem,
             username,
             password,
             connectionTimeoutSeconds,
@@ -128,7 +145,10 @@ public final class MqttSubscriber {
     BlockingQueue<Map<String, Object>> queue = new LinkedBlockingQueue<>(maxMessageCount);
 
     MqttClient client =
-        new MqttClient("tcp://" + brokerHost + ":" + brokerPort, clientId, new MemoryPersistence());
+        new MqttClient(
+            TlsSupport.brokerUri(tlsEnabled, brokerHost, brokerPort),
+            clientId,
+            new MemoryPersistence());
     client.setTimeToWait(MqttPublisher.TIME_TO_WAIT_MILLIS);
 
     boolean subscribed = false;

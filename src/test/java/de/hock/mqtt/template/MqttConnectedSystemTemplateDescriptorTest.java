@@ -6,10 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.appian.connectedsystems.templateframework.sdk.configuration.AppianValuePropertyDescriptor;
+import com.appian.connectedsystems.templateframework.sdk.configuration.BooleanPropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.ConfigurationDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.DocumentPropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.ListTypePropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.LocalTypeDescriptor;
+import com.appian.connectedsystems.templateframework.sdk.configuration.ParagraphPropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyPath;
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyState;
@@ -47,11 +49,13 @@ import org.junit.jupiter.api.Test;
  */
 class MqttConnectedSystemTemplateDescriptorTest {
 
-  /** The nine configuration fields the Connected System declares, in descriptor order. */
+  /** The eleven configuration fields the Connected System declares, in descriptor order. */
   private static final List<String> CONFIG_FIELD_KEYS =
       List.of(
           MqttConnectedSystemTemplate.BROKER_HOST,
           MqttConnectedSystemTemplate.BROKER_PORT,
+          MqttConnectedSystemTemplate.TLS_ENABLED,
+          MqttConnectedSystemTemplate.CA_CERTIFICATE,
           MqttConnectedSystemTemplate.CLIENT_IDENTIFIER,
           MqttConnectedSystemTemplate.USERNAME,
           MqttConnectedSystemTemplate.PASSWORD,
@@ -128,18 +132,18 @@ class MqttConnectedSystemTemplateDescriptorTest {
   }
 
   /**
-   * Exactly the nine expected fields, in order — which pins both "all nine present" and "no tenth
-   * field crept back in".
+   * Exactly the eleven expected fields, in order — which pins both "all eleven present" and "no
+   * twelfth field crept back in".
    */
   @Test
-  void exactlyTheNineExpectedConfigFieldKeysArePresent() {
+  void exactlyTheElevenExpectedConfigFieldKeysArePresent() {
     ConfigurationDescriptor rendered = renderConnectedSystem();
     PropertyState rootState = rendered.getRootState();
 
     assertEquals(
         CONFIG_FIELD_KEYS,
         rootTypeOf(rendered).getPropertyKeys(),
-        "this build declares exactly these nine connected system fields, in this order");
+        "this build declares exactly these eleven connected system fields, in this order");
     for (String key : CONFIG_FIELD_KEYS) {
       assertNotNull(
           rootState.getPropertyStateAtPath(new PropertyPath(key)),
@@ -172,12 +176,52 @@ class MqttConnectedSystemTemplateDescriptorTest {
       inspected++;
     }
 
-    assertEquals(9, inspected, "all nine connected system fields must have been inspected");
+    assertEquals(11, inspected, "all eleven connected system fields must have been inspected");
     assertTrue(
         offenders.isEmpty(),
         "Appian rejects a connected system template declaring any expressionable property "
             + "descriptor (APNX-1-4198-000), but these fields read back expressionable: "
             + offenders);
+  }
+
+  /**
+   * The two TLS fields added at 1.0.7 use the descriptor types they are supposed to, and neither
+   * reads back expressionable.
+   *
+   * <p>The all-eleven sweep above is the general guard; this is the field-specific one, and its real
+   * job is to stop someone "upgrading" the CA certificate field to a document upload. That is not a
+   * style preference: {@code DocumentPropertyDescriptor}'s builder force-sets the expressionable
+   * modifier and its {@code checkValidState} refuses to build with it cleared, so such a field would
+   * make Appian reject the entire connected system descriptor — the exact failure that broke the
+   * 1.0.2 deploy. {@link ParagraphPropertyDescriptor} is the only multi-line text input the SDK
+   * offers and its builder touches the modifier not at all.
+   */
+  @Test
+  void theTwoTlsFieldsUseBooleanAndParagraphDescriptorsAndAreNotExpressionable() {
+    LocalTypeDescriptor rootType = rootTypeOf(renderConnectedSystem());
+
+    PropertyDescriptor<?> tlsEnabled =
+        rootType
+            .getProperty(MqttConnectedSystemTemplate.TLS_ENABLED)
+            .orElseThrow(() -> new AssertionError("tlsEnabled must be declared"));
+    PropertyDescriptor<?> caCertificate =
+        rootType
+            .getProperty(MqttConnectedSystemTemplate.CA_CERTIFICATE)
+            .orElseThrow(() -> new AssertionError("caCertificate must be declared"));
+
+    assertTrue(
+        tlsEnabled instanceof BooleanPropertyDescriptor,
+        "tlsEnabled must be a Boolean descriptor, but was " + tlsEnabled.getClass().getSimpleName());
+    assertTrue(
+        caCertificate instanceof ParagraphPropertyDescriptor,
+        "caCertificate must be a Paragraph descriptor so PEM text can be pasted into it, but was "
+            + caCertificate.getClass().getSimpleName());
+
+    assertFalse(tlsEnabled.isExpressionable(), "tlsEnabled must not be expressionable");
+    assertFalse(
+        caCertificate.isExpressionable(),
+        "caCertificate must not be expressionable; a document field would force the flag on and "
+            + "Appian would reject the whole connected system descriptor");
   }
 
   /**

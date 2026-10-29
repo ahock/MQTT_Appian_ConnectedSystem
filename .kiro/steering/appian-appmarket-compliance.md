@@ -22,11 +22,25 @@ documentation or a real build — not inferred.
 > **untouched at nine fields**. TLS and certificates, Last Will and Testament, multi-topic
 > subscribe, reconnect attempt tuning and diagnostics remain removed.
 >
+> **`1.0.7` adds server-side TLS.** Two connected system fields — `tlsEnabled` (Boolean) and
+> `caCertificate` (Paragraph, pasted PEM) — take it from nine to **eleven**, and the broker URI
+> becomes `ssl://` when TLS is on. One new source, `de.hock.mqtt.TlsSupport` (7 → **8**), which
+> holds **no** Paho reference and **no** SDK import, so there are still exactly two Paho call sites
+> and still four files importing the SDK. **No new dependency** — the JDK supplies all crypto — so
+> `THIRD-PARTY-NOTICES.md` is unchanged. The validator gained three rules (4 → **7**). Tests 23 →
+> **35** in **nine** classes. **Mutual** TLS (client certificate, private key, passphrase) is
+> explicitly deferred to a later release; Last Will, multi-topic subscribe, reconnect attempt tuning
+> and diagnostics remain removed. **1.0.7 is not yet deployed** — the known-good reference is still
+> 1.0.6 / `68e15e8`, and the working-tree change is uncommitted. Record:
+> `.agents/tasks/server-side-tls-1.0.7.md`.
+>
 > The complete `1.0.3` source is in git commit `d023a76`, so the richer history in `.agents/tasks/`
 > describes a **superset** of what now ships — do not read a reference to a removed field as a
 > description of the current build, and note that `1.0.3`'s subscribe integration is *not* what
-> ships now (different inputs, different machinery). The hard constraints in §1 and §2 all still
-> apply; the project-specific figures throughout were updated to the 1.0.6 reality. Records:
+> ships now (different inputs, different machinery), and neither is its TLS code, which carried
+> three defects (§5 item 10). The hard constraints in §1 and §2 all still apply; the
+> project-specific figures throughout were updated to the 1.0.7 reality. Records:
+> `.agents/tasks/server-side-tls-1.0.7.md` for 1.0.7,
 > `.agents/tasks/subscribe-integration-1.0.6.md` for 1.0.6,
 > `.agents/tasks/validation-and-config-fields-1.0.5.md` for 1.0.5, and
 > `.agents/tasks/minimal-smoke-build.md` for the reduction.
@@ -52,15 +66,16 @@ Verify after any rename:
 ```bash
 # Only this file's own prose should match; no hit may be in src/, pom.xml or the built jar.
 grep -rn 'com\.appian\.mqtt' . | grep -v '/target/' | grep -v '/.agents/' | grep -v '/.kiro/'
-grep -rh 'import com.appian.connectedsystems' src/main/java/ | wc -l  # 36, across 4 files
+grep -rh 'import com.appian.connectedsystems' src/main/java/ | wc -l  # 37, across 4 files
 grep -rl 'com\.appian\.connectedsystems' src/main/java | wc -l        # 4 (3 templates + validator)
 ```
 
 The import count was 47, then 45 with the `Simple*` migration (2026-10-13), dropped to 22 across 2
 files when the plug-in was reduced to the minimal smoke-test build at 1.0.4, was 25 across 3 files at
-1.0.5, and is **36 across 4 files** at 1.0.6 — measured, not predicted: the connected system template
-11, each integration 12, and `de.hock.mqtt.ConnectionConfigValidator` 1 (it imports only
-`PropertyState`).
+1.0.5, 36 across 4 files at 1.0.6, and is **37 across 4 files** at 1.0.7 — measured, not predicted:
+the connected system template **12** (it gained `ParagraphPropertyDescriptor`), each integration 12,
+and `de.hock.mqtt.ConnectionConfigValidator` 1 (it imports only `PropertyState`).
+`de.hock.mqtt.TlsSupport` imports **no** SDK class at all, which is why the file count stays 4.
 
 ### Sources must ship *inside* the plug-in JAR
 
@@ -71,12 +86,12 @@ must be entries in the same archive as the `.class` files.
 Implemented as a `<fileSet>` over `src/main/java` in the assembly descriptor, landing sources at the
 archive root mirroring the package structure (`de/hock/mqtt/Foo.java` beside `Foo.class`).
 
-At 1.0.6 that is **7 sources**: `de/hock/mqtt/package-info.java`, `de/hock/mqtt/MqttPublisher.java`,
+At 1.0.7 that is **8 sources**: `de/hock/mqtt/package-info.java`, `de/hock/mqtt/MqttPublisher.java`,
 `de/hock/mqtt/MqttSubscriber.java`, `de/hock/mqtt/ConnectionConfigValidator.java`,
-`de/hock/mqtt/template/MqttConnectedSystemTemplate.java`,
+`de/hock/mqtt/TlsSupport.java`, `de/hock/mqtt/template/MqttConnectedSystemTemplate.java`,
 `de/hock/mqtt/integration/MqttPublishIntegration.java` and
-`de/hock/mqtt/integration/MqttSubscribeIntegration.java`. It was 5 at 1.0.5, 4 at 1.0.4 and 34
-before the reduction. The `validation` package **no longer exists** — its one class was demoted to a
+`de/hock/mqtt/integration/MqttSubscribeIntegration.java`. It was 7 at 1.0.6, 5 at 1.0.5, 4 at 1.0.4
+and 34 before the reduction. The `validation` package **no longer exists** — its one class was demoted to a
 run-time check and moved to the root package at 1.0.6, so there is no `validation/` entry of any
 kind in the jar.
 
@@ -105,6 +120,12 @@ confined to those two, no integration class touches Paho beyond catching `MqttEx
 `buildConnectOptions` stays in one place so the default-from-`null` logic is not duplicated. Set the
 assembly `dependencySet` `<outputDirectory>` to `META-INF/lib`.
 
+**Still exactly two at 1.0.7.** `de.hock.mqtt.TlsSupport` deliberately holds **no** Paho reference:
+it returns a `javax.net.ssl.SSLSocketFactory`, and `MqttConnectOptions.setSocketFactory` is called
+from `MqttPublisher.buildConnectOptions` — the one method both call sites already use and have no
+alternative to, so the single-place invariant holds for TLS as well as for the session settings, and
+neither call site can forget TLS.
+
 *Status: fixed and confirmed — the 1.0.4 deploy resolved Paho from `META-INF/lib/` on a live 26.9
 instance.*
 
@@ -114,7 +135,7 @@ This caused the second rejection.
 
 | Field | Format | Our value |
 |---|---|---|
-| `<plugin-info><version>` | **three-part `x.y.z`** | `1.0.6` |
+| `<plugin-info><version>` | **three-part `x.y.z`** | `1.0.7` |
 | `<application-version min=...>` | four-part Appian platform version | `26.9.0.0` |
 
 Appian's [configuration files page](https://docs.appian.com/suite/help/26.9/csp-configuration-files.html)
@@ -174,10 +195,18 @@ holding pasted PEM in 1.0.3. There is **no document-upload field available on a 
 template** with this SDK. `ParagraphPropertyDescriptor` is the only multi-line text input, since
 `DisplayHint` offers only `NORMAL` and `EXPRESSION`.
 
-**The table and the lesson above are the reusable finding and stay.** The two certificate fields it
-describes no longer exist, and `ParagraphPropertyDescriptor` is no longer used by this plug-in at
-all — the nine connected system fields at 1.0.6 are Text, Integer, Boolean and EncryptedText only.
-The table matters again the moment anything is restored from the archive.
+**The table and the lesson above are the reusable finding and stay.** At 1.0.7 the **eleven**
+connected system fields are Text, Integer, Boolean, EncryptedText **and Paragraph** — the last
+holding the pasted CA certificate PEM, which is why `ParagraphPropertyDescriptor` is in use again
+after being absent at 1.0.4–1.0.6. Measured with `javap -p -c` against
+`connected-systems-core-1.9.1.jar` before relying on it:
+`ParagraphPropertyDescriptor$ParagraphPropertyDescriptorBuilder`'s constructor calls only
+`PropertyDescriptorBuilder.type(SystemType.PARAGRAPH)` and `data.put("paragraphHeight", TALL)`, and
+its `build()` invokes **no** `Guard` at all — so it neither forces the expressionable modifier nor
+can refuse to build without it. It is the only multi-line text input available, since `DisplayHint`
+offers only `NORMAL` and `EXPRESSION`, and it is therefore the only way to accept a PEM certificate
+on a connected system. The table's `DocumentPropertyDescriptor` row is why: there is no
+document-upload field here, and 1.0.3 lost a deploy learning that.
 
 #### Precaution, NOT a known rule: forced-flag builders are avoided on integration inputs too
 
@@ -222,8 +251,10 @@ grep -rc isExpressionable src/main/java/de/hock/mqtt/integration/
 
 The template's Javadoc deliberately avoids the literal token `isExpressionable` so the first grep
 stays a clean zero rather than matching prose. **The Javadoc of `MqttSubscriber`,
-`ConnectionConfigValidator` and `MqttSubscribeIntegration` must avoid it too** — all three discuss
-expressionability in prose — or the per-file counts stop being 0 / 3 / 4.
+`ConnectionConfigValidator`, `MqttSubscribeIntegration` and `TlsSupport` must avoid it too** — all
+four discuss expressionability or descriptor types in prose — or the per-file counts stop being
+0 / 3 / 4. All three counts are **unchanged at 1.0.7** even though two fields were added, because
+neither new builder call touches the modifier.
 
 Sufficient: `MqttConnectedSystemTemplateDescriptorTest.noConnectedSystemPropertyDescriptorIsExpressionable`
 renders the descriptor and reads every modifier back through `PropertyDescriptor.isExpressionable()`,
@@ -236,7 +267,7 @@ the two document fields.
 
 - Maven. `maven-assembly-plugin:3.7.1`, execution `build-appian-plugin`, phase `package`, goal
   `single`, descriptor `src/assembly/plugin-assembly.xml`.
-- **Submission artifact:** `target/mqtt-broker-connected-system-1.0.6-plugin.jar` — the `-plugin`
+- **Submission artifact:** `target/mqtt-broker-connected-system-1.0.7-plugin.jar` — the `-plugin`
   suffix comes from the assembly `<id>`. A JAR without it is a stale build.
 - **Exactly one JAR must land in `target/`.** Previously two were produced and *both* carried
   `appian-plugin.xml` at the root, so either looked deployable. Keep it to one.
@@ -250,8 +281,8 @@ the two document fields.
   `net.jqwik:jqwik` and `io.moquette:moquette-broker` were removed at 1.0.4, together with the
   `maven-failsafe-plugin` block and the Surefire `**/*Properties.java` / `**/*IT.java` wiring. No
   file ever matched those patterns, so the configuration was advertising coverage that did not
-  exist — in sources AppMarket reviewers read. Surefire's default `**/*Test.java` include covers all
-  **seven** test classes at 1.0.6, so it needs no `<configuration>` block.
+  exist — in sources AppMarket reviewers read. Surefire default `**/*Test.java` include covers all
+  **nine** test classes at 1.0.7, so it needs no `<configuration>` block.
 - `THIRD-PARTY-NOTICES.md` ships at the archive root, naming Paho's permissive EDL-1.0 option of its
   dual EPL-2.0 / EDL-1.0 license. Keep it current when dependencies change.
 
@@ -280,19 +311,35 @@ Current sweep is clean; keep it that way.
   build whose purpose was to eliminate them. The 1.0.4 deploy has since shown the server does supply
   `provided` Appian SDK artifacts, so `org.apache.log4j.Logger` at `provided` scope is the sanctioned
   route whenever logging is wanted — it is simply not needed yet.
-- **No `System.setProperty()`** or any JVM/server global mutation. Relevant here: MQTT-over-TLS is
-  commonly implemented by setting `javax.net.ssl.*` system properties — never do that. Build an
-  in-memory `SSLContext` and hand the socket factory to Paho via
-  `MqttConnectOptions.setSocketFactory()`. (Moot at 1.0.6: there is no TLS. The rule applies again
-  the moment TLS is restored from the archive. The only match for a `System.setProperty` grep is a
-  Javadoc sentence in `MqttPublisher` asserting the absence of such a call — prose, not a call;
-  `MqttSubscriber`'s Javadoc deliberately phrases the same assurance without the token.)
+- **No `System.setProperty()`** or any JVM/server global mutation. The only match for a
+  `System.setProperty` grep across `src/main/java` is a Javadoc sentence in `MqttPublisher`
+  asserting the absence of such a call — prose, not a call. `MqttSubscriber` and `TlsSupport`
+  deliberately phrase the same assurance without the token, which is what keeps that grep to one
+  hit.
+
+- **MQTT over TLS must be built as an in-memory `SSLContext` handed to Paho via
+  `MqttConnectOptions.setSocketFactory`.** This is live as of 1.0.7, not hypothetical. Parse the PEM
+  with `CertificateFactory`, load it into a `KeyStore.getInstance(KeyStore.getDefaultType())` opened
+  with `load(null, null)`, feed a `TrustManagerFactory`, then `SSLContext.getInstance("TLS")`, then
+  `getSocketFactory()`. **Two Appian policies forbid the usual shortcuts, and each forbids a
+  different one:** the ban on `System.setProperty` and JVM-global mutation rules out the
+  `javax.net.ssl.*` trust-store properties — which would also change TLS behaviour for every other
+  plug-in on the server — and the ban on direct filesystem manipulation rules out writing a
+  temporary key store, which is exactly what the 1.0.3 code did. Never pin an old protocol:
+  `"TLS"` lets the JDK negotiate, and Corretto 17 already offers only TLS 1.3 and 1.2, so pinning
+  `"TLSv1.2"` as 1.0.3 did would *exclude* 1.3. Never add a permissive trust manager, not even
+  behind a flag — a blank CA means the JVM default trust store and a supplied one means that CA
+  alone, which covers both legitimate cases. Verify with the §4 greps: `SSLContext`,
+  `TrustManagerFactory` and `setSocketFactory` must appear in **only** `TlsSupport.java` and
+  `MqttPublisher.java`, and `trustAll` / `checkServerTrusted` nowhere in `src/main/java`.
 - `Closeable` resources closed in a guaranteed fashion (try-with-resources / `finally`); temp files
-  deleted. At 1.0.6 this covers **both** Paho call sites. `MqttPublisher` disconnects and closes its
+  deleted. This covers **both** Paho call sites. `MqttPublisher` disconnects and closes its
   client in a `finally` block regardless of outcome. `MqttSubscriber` does the same and
   **unsubscribes first**, in three separate `try`/`catch (MqttException ignored)` steps inside one
   `finally`, so a timeout or a thrown exception can leave neither a subscription nor a connection
   behind. Both hold with `autoReconnectEnabled` set, so nothing outlives the request.
+  `TlsSupport` adds nothing to close: it opens no operating-system resource, reading the pasted PEM
+  through a `ByteArrayInputStream` over a string already in memory.
 - **No background thread, executor or callback may outlive a request.** `MqttSubscriber` starts no
   thread and registers no `MqttCallback`: the listener handed to the three-argument
   `subscribe(filter, qos, listener)` only `offer`s a finished map into a `LinkedBlockingQueue`
@@ -301,10 +348,21 @@ Current sweep is clean; keep it that way.
   absolute `System.nanoTime` deadline, which is a deliberate bounded wait, not a busy-wait, and ends
   promptly on either the count or the deadline.
 - No direct filesystem manipulation. Use `ContentService` / Document APIs for Appian documents.
-  At 1.0.6 both `MqttPublisher` and `MqttSubscriber` pass `MemoryPersistence` to Paho, because
-  Paho's default persistence writes to disk.
+  Both `MqttPublisher` and `MqttSubscriber` pass `MemoryPersistence` to Paho, because Paho's default
+  persistence writes to disk. `TlsSupport` touches no path either: the trust store is created in
+  memory with `load(null, null)` and never written.
 - No hardcoded credentials, default passwords, or key pairs anywhere, including tests and docs. Use
-  the Secure Credentials Store.
+  the Secure Credentials Store. **This binds the TLS tests too:** `CertificateFixtures` generates
+  every key pair and certificate at run time inside the test JVM, holds private keys only as
+  in-memory objects, and uses a randomly generated single-use passphrase for its in-memory server
+  key store, so no literal in the repository can be mistaken for a credential. No `.pem`, `.key`,
+  `.p12`, `.jks` or keystore file exists anywhere in the repo or the jar — verify with the §4 sweep.
+- **Never put certificate or key material, or any part of it, into an error message or response.**
+  A parse failure may say that parsing failed and name the expected `-----BEGIN CERTIFICATE-----`
+  header, but must not echo the field's contents. `TlsSupport` throws `GeneralSecurityException`
+  with fixed sentences and the original as cause; both integrations catch it with a fixed message of
+  their own rather than `e.getMessage()`; and the validator discards the caught message. Tests
+  assert no six-character run of the input appears in any message.
 - No copyleft third-party libraries.
 - Do not use the Administrator `ServiceContext`; use the context from the initial constructor.
 
@@ -316,43 +374,40 @@ Run all of this and read the output — a green build alone proves nothing.
 
 ```bash
 cd /Users/andreas.hock/Documents/Appian-Projects/MQTT_Component
-mvn -o clean package                             # BUILD SUCCESS
-mvn -o test                                      # Tests run: 23, Failures: 0, Errors: 0
-J=target/mqtt-broker-connected-system-1.0.6-plugin.jar
 
+mvn -o clean package                             # BUILD SUCCESS
+mvn -o test                                      # Tests run: 35, Failures: 0, Errors: 0
+J=target/mqtt-broker-connected-system-1.0.7-plugin.jar
+
+# --- packaging invariants, against the BUILT jar ---
 ls target/*.jar | wc -l                          # 1 — exactly ONE jar
-unzip -l $J | grep -c '\.java$'                  # 7 sources
-unzip -l $J | grep '\.java$' | grep -vc 'de/hock/mqtt/'   # 0 — none outside the package
-unzip -l $J | grep -cE ' appian-plugin\.xml$'    # 1
-unzip -l $J | awk '{print $NF}' | grep -c '^appian-plugin.xml$'   # 1 — bare root, no prefix
+unzip -l $J | grep -c '\.java$'                  # 8 sources
+unzip -l $J | grep '\.java$' | grep -vc 'de/hock/mqtt/'          # 0 — none outside the package
+unzip -l $J | awk '{print $NF}' | grep -c '^appian-plugin.xml$'  # 1 — bare root, no prefix
 unzip -l $J | grep -c 'META-INF/lib/.*\.jar$'    # 1 — Paho is the only nested jar
-unzip -l $J | grep -c 'META-INF/lib/org.eclipse.paho'     # 1
+unzip -l $J | grep -c 'META-INF/lib/org.eclipse.paho'            # 1
 unzip -l $J | grep -ci 'connected-systems'       # 0, both Appian artifacts are provided
 unzip -l $J | grep -c 'com/appian/mqtt'          # 0
 unzip -l $J | grep -ci test                      # 0
-unzip -l $J | grep -ci 'backup'                  # 0 — nothing from .backup/
-unzip -l $J | grep -c 'validation/'              # 0 — the validation package is gone (1.0.6)
+unzip -l $J | grep -ci 'backup'                  # 0
+unzip -l $J | grep -c 'validation/'              # 0 — the validation package is still gone
 unzip -l $J | awk '{print $NF}' | grep -c '^THIRD-PARTY-NOTICES.md$'   # 1
+unzip -l $J | grep -c 'de/hock/mqtt/TlsSupport'  # 2 — TlsSupport.class and TlsSupport.java
 unzip -p $J appian-plugin.xml | grep -E '<version>|application-version|<vendor'
-#   <version>1.0.6</version> / min="26.9.0.0" / vendor name="Hock"
+#   <version>1.0.7</version> / min="26.9.0.0" / vendor name="Hock"
 #   (the grep also matches two manifest comment lines that discuss the two version formats)
-unzip -p $J appian-plugin.xml | grep -c 'key="de.hock.mqtt"'   # 1 — plug-in key unchanged
+unzip -p $J appian-plugin.xml | grep -c 'key="de.hock.mqtt"'     # 1 — plug-in key unchanged
 unzip -p $J appian-plugin.xml \
   | grep -cE 'key="Mqtt(ConnectedSystemTemplate|PublishIntegration|SubscribeIntegration)"'
-#   3 — all module keys unchanged, so the build REPLACES the installed one
+#   3 — all module keys unchanged, so 1.0.7 REPLACES the installed 1.0.6
 unzip -p $J appian-plugin.xml | grep -nE 'connected-system-template|integration-template'
-#   the TWO <integration-template> elements must be nested inside the ONE
+#   the TWO <integration-template> elements must still be nested inside the ONE
 #   <connected-system-template>, not siblings of it
-javap -verbose -cp target/classes de.hock.mqtt.template.MqttConnectedSystemTemplate \
-  | grep 'major version'                         # 61
-javap -verbose -cp target/classes de.hock.mqtt.MqttPublisher | grep 'major version'   # 61
-javap -verbose -cp target/classes de.hock.mqtt.MqttSubscriber | grep 'major version'  # 61
-javap -verbose -cp target/classes de.hock.mqtt.ConnectionConfigValidator \
-  | grep 'major version'                         # 61
-javap -verbose -cp target/classes de.hock.mqtt.integration.MqttPublishIntegration \
-  | grep 'major version'                         # 61
-javap -verbose -cp target/classes de.hock.mqtt.integration.MqttSubscribeIntegration \
-  | grep 'major version'                         # 61
+for c in template.MqttConnectedSystemTemplate MqttPublisher MqttSubscriber TlsSupport \
+         ConnectionConfigValidator integration.MqttPublishIntegration \
+         integration.MqttSubscribeIntegration; do
+  printf '%s ' $c; javap -verbose -cp target/classes de.hock.mqtt.$c | grep 'major version'
+done                                             # 61 for all seven
 
 # Expressionability — the grep is necessary, the test is what actually proves it (see §1).
 grep -c isExpressionable src/main/java/de/hock/mqtt/template/MqttConnectedSystemTemplate.java  # 0
@@ -365,15 +420,35 @@ grep -rc isExpressionable src/main/java/ | grep -v ':0$'
 # Namespace trap and the SDK import census (§1).
 grep -rn 'com\.appian\.mqtt' . | grep -v '/target/' | grep -v '/.agents/' | grep -v '/.kiro/' \
   | grep -v '/.git/'                             # no hits
-grep -rh 'import com.appian.connectedsystems' src/main/java/ | wc -l   # 36
+grep -rh 'import com.appian.connectedsystems' src/main/java/ | wc -l   # 37
 grep -rl 'com\.appian\.connectedsystems' src/main/java | wc -l         # 4
+grep -rc 'import com.appian.connectedsystems' src/main/java/
+#   template 12, each integration 12, ConnectionConfigValidator 1, the rest 0
 
-# Code policies (§3). The only hit is a Javadoc sentence in MqttPublisher asserting the absence
-# of a System.setProperty call — prose, not a call. Any other hit is a real violation.
-grep -rn 'System\.out\|System\.err\|printStackTrace\|System\.setProperty\|java\.util\.logging' \
+# Code policies (§3), including the two TLS-specific bans.
+grep -rn 'System\.out\|System\.err\|printStackTrace\|java\.util\.logging' src/main/java/
+#   expect NO hits
+grep -rnE 'System\.setProperty|javax\.net\.ssl\.(trustStore|keyStore)|createTempFile|File\.createTemp|java\.io\.File|java\.nio\.file' \
   src/main/java/
+#   expect EXACTLY ONE hit: the Javadoc sentence in MqttPublisher asserting the absence of a
+#   System.setProperty call. Prose, not a call. Any other hit is a real violation — in particular
+#   TlsSupport and MqttSubscriber must phrase the same assurance without these tokens.
+grep -rn 'SSLContext\|setSocketFactory\|TrustManagerFactory' src/main/java/ | cut -d: -f1 | sort -u
+#   expect only de/hock/mqtt/TlsSupport.java and de/hock/mqtt/MqttPublisher.java
+grep -rniE 'trustAll|X509TrustManager *\(|checkServerTrusted' src/main/java/
+#   expect NO hits — there is no permissive trust manager anywhere in main
+grep -rn 'setSSLHostnameVerifier\|setSSLProperties' src/main/java/
+#   expect NO hits — see the finding in §5 item 10
 
-# Resource bundle: no orphan keys, no missing keys (22 keys, 16 of them field labels).
+# No key material anywhere (§3).
+grep -rniE 'BEGIN (RSA |EC |DSA )?PRIVATE KEY|BEGIN ENCRYPTED PRIVATE KEY' . \
+  --exclude-dir=.git --exclude-dir=target        # no hits outside this file's own prose
+find . -path ./.git -prune -o -path ./target -prune -o \
+  \( -name '*.jks' -o -name '*.p12' -o -name '*.pfx' -o -name '*.key' -o -name '*.pem' \
+     -o -name '*.keystore' -o -name '*.truststore' \) -print     # nothing
+unzip -l $J | grep -ciE '\.(jks|p12|pfx|key|pem|keystore|truststore)$'   # 0
+
+# Resource bundle: no orphan keys, no missing keys (24 keys, 18 of them field labels).
 B=src/main/resources/resources_en_US.properties
 sed -nE 's/^([A-Za-z][A-Za-z.]*)=.*/\1/p' $B | sort > /tmp/bundle-actual.txt
 { echo MqttConnectedSystemTemplate.name; echo MqttConnectedSystemTemplate.description
@@ -387,11 +462,18 @@ sed -nE 's/^([A-Za-z][A-Za-z.]*)=.*/\1/p' $B | sort > /tmp/bundle-actual.txt
     src/main/java/de/hock/mqtt/integration/MqttSubscribeIntegration.java
 } | sort > /tmp/bundle-expected.txt
 diff /tmp/bundle-expected.txt /tmp/bundle-actual.txt   # no output; '>' = orphan, '<' = missing
-#   The three sed patterns hold only while the NINE config keys are the ONLY
+wc -l < /tmp/bundle-actual.txt                         # 24
+#   The three sed patterns hold only while the ELEVEN config keys are the ONLY
 #   `public static final String` constants on the template and the three/four input keys the only
 #   `public static final String INPUT_*` constants on each integration. Keep result-map keys
 #   ("success", "status", "topic", "qos", "messages", "messageCount", "payload", "retained",
-#   "binary") as inline literals.
+#   "binary") as inline literals. TlsSupport's PEM_CERTIFICATE_HEADER is package-private and in a
+#   different file, so it cannot leak into this check — keep it that way.
+
+# Plain tcp:// is unchanged when TLS is off.
+#   Proven by TlsSupportTest.tlsDisabledProducesATcpUriAndNoSocketFactory, which asserts the tcp://
+#   URI and a NULL socket factory even with a valid CA present in state, and by the otherwise
+#   untouched MqttPublisherConnectOptionsTest assertions.
 
 # The full 1.0.3 source is recoverable from git, not from an archive.
 git show --stat d023a76 | head -3     # "first commit", the complete 1.0.3 build
@@ -446,7 +528,17 @@ What the 1.0.6 deploy additionally proved, each previously untested:
 - Removing design-time validation did not disturb page rendering, confirming item 7's conclusion
   from the other direction.
 
-Items 1, 2, 5, 7 and 8 are resolved; 3, 4 and 6 are not.
+**1.0.7 is NOT yet deployed.** It adds server-side TLS and is verified offline only — 35 tests, the
+full §4 block, and the bytecode evidence in item 10. The known-good reference therefore remains
+**1.0.6 / commit `68e15e8`**, and the 1.0.7 change is an **uncommitted working-tree change**: do
+not cite a SHA for it. Three things it asserts are still untested on a real instance, and the deploy
+checklist in `.agents/tasks/server-side-tls-1.0.7.md` is what clears them: that Paho's `ssl`
+`NetworkModuleFactory` resolves through Appian's plug-in classloader via its `ServiceLoader` (the
+symptom of failure would be an `IllegalArgumentException` on the `ssl://` URI at connect time); that
+mode 2 finds the broker's CA in the Appian server's own trust store; and that a wrong CA really does
+**fail** the connection, which is the single most important runtime check in the release.
+
+Items 1, 2, 5, 7, 8 and 10 are resolved; 3, 4 and 6 are not.
 
 1. **SDK version conflict** (§2) — **settled in practice 2026-10-27.** Appian's compatibility table
    names Core 1.2.0 for every release from 24.4 through 26.9, while we ship against **1.9.1**. The
@@ -491,26 +583,35 @@ Items 1, 2, 5, 7 and 8 are resolved; 3, 4 and 6 are not.
 3. **No connected system logos.** Appian expects
    `src/main/resources/de/hock/mqtt/MqttConnectedSystemTemplate_{40,50,80}px.png`. Without them the
    connected system renders iconless. Separate from the AppMarket listing icon (§6).
-4. **Test coverage is offline only — 23 tests in seven classes** (13 at 1.0.5, 7 at 1.0.4, 19 at
-   1.0.3): 2 in `ProjectStructureTest`, 7 in `MqttConnectedSystemTemplateDescriptorTest`, 1 in
-   `MqttConnectedSystemTemplateNoDesignTimeErrorsTest`, 4 in `ConnectionConfigValidatorTest`, 2 in
-   `MqttPublisherConnectOptionsTest`, 3 in `MqttSubscriberTest` and 4 in
-   `MqttSubscribeIntegrationInputsTest`.
+4. **Test coverage is offline only — 35 tests in nine classes** (23 at 1.0.6, 13 at 1.0.5, 7 at
+   1.0.4, 19 at 1.0.3): 2 in `ProjectStructureTest`, 8 in
+   `MqttConnectedSystemTemplateDescriptorTest`, 1 in
+   `MqttConnectedSystemTemplateNoDesignTimeErrorsTest`, 7 in `ConnectionConfigValidatorTest`, 2 in
+   `MqttPublisherConnectOptionsTest`, 3 in `MqttSubscriberTest`, 4 in
+   `MqttSubscribeIntegrationInputsTest`, **5 in `TlsSupportTest`** and **3 in
+   `TlsHostnameVerificationTest`**. A ninth file, `CertificateFixtures`, is a fixture factory and
+   deliberately not named `Test*` / `*Test` so Surefire does not try to run it.
+   **Two tests bind an ephemeral loopback port on `127.0.0.1`** — the two handshake tests — and that
+   is the only socket activity in the suite; nothing needs a broker or a route off the machine.
    `ProjectStructureTest` checks that `appian-plugin.xml` and `resources_en_US.properties` are on
    the classpath. The others drive the real framework entry points with the empty descriptor
    Appian supplies for a new object (`ConfigurationDescriptor.builder().build()`, whose
    `getRootState()` is `null`) or call the package-private runtime seams directly:
    - `brandNewConnectedSystemRendersANonNullRootStateWithAResolvableRootType` — the NPE regression
      guard, and the single most valuable test here.
-   - `exactlyTheNineExpectedConfigFieldKeysArePresent` — the nine config keys as an **ordered list**,
-     so a tenth field fails too. Verified at 1.0.4 by temporarily adding one.
+   - `exactlyTheElevenExpectedConfigFieldKeysArePresent` — the eleven config keys as an **ordered
+     list**, so a twelfth field fails too. Verified at 1.0.4 by temporarily adding one.
    - `noConnectedSystemPropertyDescriptorIsExpressionable` — reads every modifier back through
-     `PropertyDescriptor.isExpressionable()` and names each offender, now across all nine fields. It
-     is what caught the two forced-expressionable document fields a source grep could not see, and it
-     fails if `.isExpressionable(true)` is reintroduced; re-verified at 1.0.5 by temporarily adding
-     it to `cleanSession`, which failed naming `cleanSession (BooleanPropertyDescriptor)`.
+     `PropertyDescriptor.isExpressionable()` and names each offender, now across all eleven fields.
+     It is what caught the two forced-expressionable document fields a source grep could not see, and
+     it fails if `.isExpressionable(true)` is reintroduced; re-verified at 1.0.5 by temporarily
+     adding it to `cleanSession`, which failed naming `cleanSession (BooleanPropertyDescriptor)`.
    - `connectedSystemFieldsUseNoListDocumentOrAppianValueDescriptor` — `RefreshPolicy.NEVER`, not
      hidden, and no `List`/`Document`/`AppianValue` descriptor type.
+   - `theTwoTlsFieldsUseBooleanAndParagraphDescriptorsAndAreNotExpressionable` — added at 1.0.7.
+     The field-specific guard whose real job is to stop anyone "upgrading" the CA certificate field
+     to a document upload, which would force the expressionable flag and break page rendering
+     exactly as it did at 1.0.2.
    - `publishIntegrationRendersItsRootStateAndItsThreeExpressionableInputs` — the three input keys
      in display order, and all three expressionable, which pins the deliberate asymmetry with the
      connected system.
@@ -520,7 +621,7 @@ Items 1, 2, 5, 7 and 8 are resolved; 3, 4 and 6 are not.
      descriptor type. The second is a **precaution** on integration inputs, not a known platform
      rule (§1).
    - `brandNewConnectedSystemRendersWithNoAttachedErrors` — the 1.0.6 replacement for 1.0.5's
-     ungated-probe test. A brand-new object carries no error on any of the nine fields and none on
+     ungated-probe test. A brand-new object carries no error on any of the eleven fields and none on
      the root, because nothing attaches errors any more. The three other 1.0.5 validation tests
      (`validBrokerHostAndPortLeaveThoseFieldsFreeOfErrors`,
      `outOfRangeBrokerPortIsReportedOnTheBrokerPortPathNotTheRoot`,
@@ -553,15 +654,57 @@ Items 1, 2, 5, 7 and 8 are resolved; 3, 4 and 6 are not.
      contract: defaults 0 / 10 / 10, **rejection rather than clamping** with the offending value
      named, an empty collection as success with `messageCount` 0, and the first guard returning
      before any socket is opened.
+   - `aCaCertificateWithTlsDisabledIsReported`, `anUnparseableCaCertificateIsReported` and
+     `aBareNumberCaCertificateIsReportedAsAProbableDocumentId` — the three TLS validator rules added
+     at 1.0.7, each also asserting the message echoes **no** part of the field's contents. The first
+     carries the control cases: the same CA with TLS on is accepted (mode 3), and TLS on with a
+     blank CA is accepted (mode 2).
+   - `tlsDisabledProducesATcpUriAndNoSocketFactory` — the **mode 1 regression lock**: the `tcp://`
+     URI for both `FALSE` and `null`, and a `null` socket factory even with a valid CA present in
+     state, so a stale certificate cannot drag TLS into a plain connection.
+   - `tlsEnabledWithoutACaUsesTheDefaultTrustStoreOverAnSslUri` — mode 2: the `ssl://` URI, a
+     non-null factory, more than 20 accepted issuers from the JVM default store (asserted loosely so
+     a JDK update cannot fail the build), rejection of a throwaway self-signed certificate, and a
+     produced socket offering TLS 1.2 but neither TLS 1.0 nor 1.1 — which pins the
+     `SSLContext.getInstance("TLS")` decision.
+   - `tlsEnabledWithACaTrustsOnlyThatCa` — **the test that proves restriction rather than
+     configuration**, and the most valuable one added at 1.0.7. Exactly one accepted issuer; a leaf
+     signed by that CA accepted; an unrelated self-signed certificate **rejected**. Verified to have
+     teeth by inverting the rejection assertion once and watching it fail. Do not weaken it to
+     "the factory is non-null".
+   - `aMultiCertificatePemChainLoadsEveryCertificate` — a two-block PEM parses to 2 in pasted order
+     and yields 2 accepted issuers, so distinct aliases really do prevent overwriting.
+   - `malformedCaCertificateIsRejectedWithoutEchoingItsContent` — a bare number, prose, `""`,
+     whitespace and a header-with-broken-base64 block all rejected, each with the message asserted
+     to contain no six-character run of the input; plus a CRLF-and-whitespace-padded valid PEM still
+     parsing, which is the paste-from-Windows path. Note the bogus inputs are chosen to share no
+     English with the fixed messages: a substring scan cannot tell a leak from the word
+     "certificate" appearing in both, and the inputs were changed rather than the scan weakened.
+   - `pahoAppliesHttpsEndpointIdentificationOnSslByDefaultAndThePluginSetsItExplicitly` — pins
+     Paho's own `true` default, so a dependency bump that flipped it fails the build rather than
+     silently weakening every TLS connection; plus the plug-in setting it explicitly and leaving
+     `getSSLHostnameVerifier()` null.
+   - `aBrokerCertificateMatchingTheConfiguredHostCompletesTheHandshake` and
+     `aBrokerCertificateForADifferentHostFailsTheHandshake` — the two loopback handshakes, which
+     replicate Paho's **exact** socket sequence (no-arg `createSocket()`, `connect` with an
+     `InetSocketAddress`, SNI parameters, then endpoint-identification parameters, then
+     `startHandshake`). That is what makes them evidence about Paho rather than about an idealised
+     TLS client, and in particular proves the host name survives the unconnected-socket pattern.
+     Both carry `@Timeout(30)`, use a daemon accept thread, close the server socket in `finally`,
+     and **do not instantiate Paho**, whose client starts non-daemon threads. Verified to have teeth
+     by giving the mismatch test a matching SAN once and watching it fail.
 
-   Config keys covered: 9. Publish input keys covered: 3. Subscribe input keys covered: 4.
-   **Nothing exercises a real publish or a real subscribe**, and no test needs a broker; the
-   slowest test takes ~0.3 s. The dead `net.jqwik` / `io.moquette` dependencies and the
+   Config keys covered: 11. Publish input keys covered: 3. Subscribe input keys covered: 4.
+   **Nothing exercises a real publish or a real subscribe**, no test needs a broker, and nothing
+   proves mode 2 against the Appian server's own trust store — that is what the deploy checklist is
+   for. The dead `net.jqwik` / `io.moquette` dependencies and the
    `**/*Properties.java` / `**/*IT.java` Surefire-Failsafe wiring that this item used to complain
    about were **removed** at 1.0.4 — see §2.
 5. **RESOLVED 2026-10-27: the project is a git repository** on branch `main`, remote
-   `https://github.com/ahock/MQTT_Appian_ConnectedSystem.git`, pushed and in sync. History, newest
-   first:
+   `https://github.com/ahock/MQTT_Appian_ConnectedSystem.git`. History, newest first:
+   - **1.0.7 — UNCOMMITTED working-tree change.** Server-side TLS. **Do not invent a SHA for it.**
+     The tip of `main` when it was written was `8621e99`; the user owns the commit.
+   - `8621e99` records 1.0.6 as deployed, tested and the known-good reference.
    - `68e15e8` **1.0.6 — deployed and tested working. The current known-good reference.** Diff
      against this when anything breaks.
    - `4bef5ec` recovery references repointed at git after the `.backup` zip was deleted.
@@ -656,6 +799,50 @@ Items 1, 2, 5, 7 and 8 are resolved; 3, 4 and 6 are not.
    `checkValidState`, `StateGenerator`) are the limit of what can be checked here, which is how the
    forced-expressionable types in §1 were found. Everything the *platform* enforces beyond that is
    discoverable only by deploying.
+10. **ANSWERED (offline, 2026-10-28) — Paho 1.2.5 DOES perform hostname verification on `ssl://`,
+    by default. No socket-factory wrapper is needed, and building one would have been a mistake.**
+
+    The premise this release was planned against — that `setHttpsHostnameVerificationEnabled`
+    applies only to the WebSocket transport — is **false for Paho 1.2.5**. Measured with
+    `javap -p -c` against the bundled jar, and re-verified independently during implementation:
+
+    - `SSLNetworkModuleFactory.getSupportedUriSchemes()` builds a one-element set from
+      `ldc "ssl"`, so this class is the `ssl://` factory; its `createNetworkModule` calls
+      `SSLNetworkModule.setHttpsHostnameVerificationEnabled(options.isHttpsHostnameVerificationEnabled())`.
+    - `MqttConnectOptions`' constructor seeds `httpsHostnameVerificationEnabled` **`true`**
+      (`iconst_1; putfield`).
+    - `SSLNetworkModule.start()` sets SNI server names, then — when the flag is true — a fresh
+      `SSLParameters` with `setEndpointIdentificationAlgorithm("HTTPS")`, then `startHandshake()`.
+      A wrong-SAN certificate is therefore rejected by the JSSE handshake itself.
+
+    Confirmed end to end by two offline tests against a loopback `SSLServerSocket`: a matching
+    subject alternative name completes the handshake, a mismatched one fails with
+    `SSLHandshakeException` naming the missing name.
+
+    **Three corollaries, all binding:**
+    - **Never set a custom `HostnameVerifier`.** Paho runs `setSSLHostnameVerifier`'s verifier
+      **only when the HTTPS flag is false**, so setting both is contradictory. Leave it null and set
+      the flag — which the plug-in does explicitly rather than inheriting a default it cannot see.
+      Note the `setEndpointIdentificationAlgorithm` block is wrapped in
+      `catch (NoSuchMethodError)`, which is the other reason not to rely on an unseen default.
+    - **Do not wrap the socket factory.** `TCPNetworkModule.start()`, inherited by
+      `SSLNetworkModule`, calls the **no-argument** `SocketFactory.createSocket()` and then
+      `connect(new InetSocketAddress(host, port), timeout)`. `javap -c javax.net.SocketFactory`
+      shows the inherited no-arg implementation throws
+      `SocketException("Unconnected sockets not implemented")`. 1.0.3's
+      `TlsVersionConstrainingSocketFactory` overrode six overloads but **not** that one, so every
+      TLS connection it attempted would have failed — a **third** defect in that code, alongside the
+      never-resolved document id and the unusable passphrase. Record all three when citing 1.0.3's
+      TLS as a reference.
+    - The host name survives the unconnected-socket pattern that normally degrades verification to
+      an IP check, because `InetSocketAddress(String, int)` retains the name and `SSLSocketImpl`
+      adopts it. Verification therefore runs against the host from the broker URI — what the
+      designer typed.
+
+    *Still untested on a real instance:* whether the Appian server's own JSSE configuration (a site
+    trust store set through the JSSE system properties) changes mode 2.
+    `TrustManagerFactory.init((KeyStore) null)` reads those properties, which is intended and is a
+    read, never a write.
 
 ---
 
@@ -697,8 +884,10 @@ Full evidence lives in `.agents/tasks/`.
 
 > **Read this first.** The project was **deliberately reduced to a minimal smoke-test build at
 > 1.0.4** (2026-10-27), extended at **1.0.5** with four session fields and an ungated design-time
-> validation probe, and extended again at **1.0.6** with the subscribe integration — which also
-> deleted design-time validation, because the probe's answer was that Appian never displayed it.
+> validation probe, extended again at **1.0.6** with the subscribe integration — which also
+> deleted design-time validation, because the probe's answer was that Appian never displayed it —
+> and extended at **1.0.7** with server-side TLS (two fields, nine → eleven), which is verified
+> offline but **not yet deployed**.
 > Everything below 1.0.6 records how the platform and packaging constraints were discovered on the
 > *full* plug-in, so it describes a **superset** of what now ships: certificate fields, LWT,
 > reconnect attempt tuning, multi-topic subscribe and diagnostics all appear in these records and
@@ -708,13 +897,23 @@ Full evidence lives in `.agents/tasks/`.
 > former `.backup/` zip was deleted in `91c9e81` as redundant. The hard constraints in §1 and §2 are
 > what carried forward and still bind.
 
+- `server-side-tls-1.0.7.md` — the 1.0.7 release record: the two TLS fields and three connection
+  modes, the hostname-verification finding with its bytecode evidence and the no-wrapper decision,
+  the three 1.0.3 TLS defects, the three validator rules with the hard-error judgement and its
+  trade-off, the test inventory, and the deploy-and-test checklist. **Start here for what currently
+  ships** — but note 1.0.7 is not yet deployed.
+- `server-side-tls-1.0.7-verification.md` — the pasted real output of the §4 block for 1.0.7,
+  expected against actual.
+- `server-side-tls-1.0.7-plan.md` — the plan behind 1.0.7: the hostname-verification investigation
+  with its `javap` evidence, the class layout, the field wiring, the validator rules, the test list
+  and the documentation lockstep table.
 - `subscribe-integration-1.0.6-plan.md` — the plan behind 1.0.6: the seven up-front decisions with
   their reasoning, the `javap` evidence on `ListTypePropertyDescriptor`, the figure table, and the
   thirteen ordered implementation steps.
 - `subscribe-integration-1.0.6.md` — the 1.0.6 release record: the subscribe integration's inputs,
   output shape and teardown path, the `ConfigValidator` demotion with what replaced each rule, the
   behaviour change on out-of-range session values, the full pasted verification output, and the
-  deploy-and-test checklist. **Start here for what currently ships.**
+  deploy-and-test checklist.
 - `validation-and-config-fields-1.0.5-plan.md` — the plan behind 1.0.5: the resolved SDK questions
   with `javap` evidence, the exact target figures, and the ordered implementation steps.
 - `validation-and-config-fields-1.0.5.md` — the 1.0.5 release record: the four new fields with their

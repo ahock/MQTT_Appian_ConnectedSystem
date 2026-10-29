@@ -7,20 +7,33 @@ import com.appian.connectedsystems.templateframework.sdk.TemplateId;
 import com.appian.connectedsystems.templateframework.sdk.configuration.BooleanPropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.EncryptedTextPropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.IntegerPropertyDescriptor;
+import com.appian.connectedsystems.templateframework.sdk.configuration.ParagraphPropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyDescriptor;
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyPath;
 import com.appian.connectedsystems.templateframework.sdk.configuration.PropertyState;
 import com.appian.connectedsystems.templateframework.sdk.configuration.TextPropertyDescriptor;
 
 /**
- * Connected System template declaring the broker configuration of the minimal smoke-test build.
+ * Connected System template declaring the broker configuration.
  *
  * <p>This is the design-time configuration surface a Designer fills in once on an <em>MQTT
  * Broker</em> Connected System object; both the publish and the subscribe integration then reuse
- * it. The build declares nine fields — broker host, broker port, client identifier, username,
- * password, connection timeout, keep-alive interval, clean session and automatic reconnect — every
- * one of which reaches Paho at run time. TLS and Last Will and Testament are not present; the full
- * 1.0.3 surface is preserved in git commit {@code d023a76}.
+ * it. The build declares eleven fields — broker host, broker port, TLS enablement, CA certificate,
+ * client identifier, username, password, connection timeout, keep-alive interval, clean session and
+ * automatic reconnect — every one of which reaches Paho at run time. Mutual TLS and Last Will and
+ * Testament are not present; the full 1.0.3 surface is preserved in git commit {@code d023a76}.
+ *
+ * <p><strong>The two TLS fields, added at 1.0.7.</strong> {@link #TLS_ENABLED} is a
+ * {@link BooleanPropertyDescriptor} that switches the broker URI from {@code tcp://} to
+ * {@code ssl://}; it never changes the configured port, which stays the designer's choice.
+ * {@link #CA_CERTIFICATE} is a {@link ParagraphPropertyDescriptor} holding a PEM-encoded broker CA
+ * certificate pasted as text, and blank means "trust the Appian server's own certificate
+ * authorities". Paragraph is the SDK's only multi-line text input, since {@code DisplayHint} offers
+ * only {@code NORMAL} and {@code EXPRESSION}, and its builder's constructor touches nothing beyond
+ * {@code type(PARAGRAPH)} and a {@code TALL} height — measured against
+ * {@code connected-systems-core:1.9.1}, where its {@code build()} invokes no {@code Guard} at all.
+ * There is deliberately <em>no</em> document-upload field for the certificate: see the next
+ * paragraph but one for why no such field can exist on a connected system with this SDK.
  *
  * <p><strong>SDK shape.</strong> The class extends {@link SimpleConnectedSystemTemplate} from
  * {@code com.appian:connected-systems-client} and declares its fields in
@@ -47,8 +60,12 @@ import com.appian.connectedsystems.templateframework.sdk.configuration.TextPrope
  * {@code AppianValuePropertyDescriptor} seed it in their constructor and reject a cleared flag in
  * {@code checkValidState}, and {@code ListTypePropertyDescriptor} couples it to an
  * {@code EXPRESSION} display hint — so those types are unusable on a connected system template.
- * Only {@link TextPropertyDescriptor}, {@link IntegerPropertyDescriptor},
- * {@link BooleanPropertyDescriptor} and {@link EncryptedTextPropertyDescriptor} are used below;
+ * That is precisely why the CA certificate is pasted PEM text rather than an uploaded document:
+ * {@code DocumentPropertyDescriptor.builder()...build()} throws
+ * {@code IllegalStateException: DOCUMENT property descriptors must be expressionable}, so no
+ * document-upload field is available here at all. Only {@link TextPropertyDescriptor},
+ * {@link IntegerPropertyDescriptor}, {@link BooleanPropertyDescriptor},
+ * {@link EncryptedTextPropertyDescriptor} and {@link ParagraphPropertyDescriptor} are used below;
  * each of those base builders seeds the modifier {@code false} and none forces it on.
  *
  * <p><strong>There is no design-time validation here, and there must not be.</strong> Release 1.0.5
@@ -74,6 +91,14 @@ public class MqttConnectedSystemTemplate extends SimpleConnectedSystemTemplate {
   /** Field key: broker TCP port. */
   public static final String BROKER_PORT = "brokerPort";
 
+  /** Field key: enable TLS, switching the broker URI from {@code tcp://} to {@code ssl://}. */
+  public static final String TLS_ENABLED = "tlsEnabled";
+
+  /**
+   * Field key: PEM-encoded broker CA certificate; blank means the JVM default trust store.
+   */
+  public static final String CA_CERTIFICATE = "caCertificate";
+
   /** Field key: MQTT client identifier; auto-generated by Paho when left blank. */
   public static final String CLIENT_IDENTIFIER = "clientIdentifier";
 
@@ -96,7 +121,7 @@ public class MqttConnectedSystemTemplate extends SimpleConnectedSystemTemplate {
   public static final String AUTO_RECONNECT_ENABLED = "autoReconnectEnabled";
 
   /**
-   * Declares the nine configuration fields.
+   * Declares the eleven configuration fields.
    *
    * <p>{@link SimpleConfiguration#setProperties(PropertyDescriptor...)} builds the root local type,
    * registers it in the descriptor's type map, and generates the root {@link PropertyState} from it
@@ -106,7 +131,7 @@ public class MqttConnectedSystemTemplate extends SimpleConnectedSystemTemplate {
    *
    * @param configuration the configuration wrapper for the (possibly empty) incoming descriptor
    * @param executionContext the design-time execution context, unused
-   * @return the same configuration with the nine properties declared
+   * @return the same configuration with the eleven properties declared
    */
   @Override
   protected SimpleConfiguration getConfiguration(
@@ -122,9 +147,29 @@ public class MqttConnectedSystemTemplate extends SimpleConnectedSystemTemplate {
         IntegerPropertyDescriptor.builder()
             .key(BROKER_PORT)
             .label("Broker Port")
-            .instructionText("Broker TCP port. Typically 1883 for a plain TCP connection.")
+            .instructionText("Broker TCP port. Typically 1883 for plain TCP and 8883 for TLS.")
             .placeholder("1883")
             .isRequired(true)
+            .build(),
+        BooleanPropertyDescriptor.builder()
+            .key(TLS_ENABLED)
+            .label("Enable TLS")
+            .instructionText(
+                "Connect over TLS (ssl://) instead of plain TCP. Set the port yourself: 1883 is the"
+                    + " convention for plain TCP and 8883 for TLS. Enabling this does not change the"
+                    + " port.")
+            .isRequired(false)
+            .build(),
+        ParagraphPropertyDescriptor.builder()
+            .key(CA_CERTIFICATE)
+            .label("CA Certificate")
+            .instructionText(
+                "Optional. Paste the broker's CA certificate as PEM text, starting with"
+                    + " -----BEGIN CERTIFICATE-----. Leave blank to trust the certificate"
+                    + " authorities the Appian server already trusts, which is correct for a broker"
+                    + " with a publicly trusted certificate. A certificate chain with several PEM"
+                    + " blocks is accepted.")
+            .isRequired(false)
             .build(),
         TextPropertyDescriptor.builder()
             .key(CLIENT_IDENTIFIER)

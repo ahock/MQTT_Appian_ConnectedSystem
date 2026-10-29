@@ -30,11 +30,15 @@ import org.junit.jupiter.api.Test;
  */
 class MqttConnectedSystemTemplateNoDesignTimeErrorsTest {
 
-  /** All nine field keys, so the assertion covers the required ones as well as the optional ones. */
+  /**
+   * All eleven field keys, so the assertion covers the required ones as well as the optional ones.
+   */
   private static final List<String> ALL_FIELD_KEYS =
       List.of(
           MqttConnectedSystemTemplate.BROKER_HOST,
           MqttConnectedSystemTemplate.BROKER_PORT,
+          MqttConnectedSystemTemplate.TLS_ENABLED,
+          MqttConnectedSystemTemplate.CA_CERTIFICATE,
           MqttConnectedSystemTemplate.CLIENT_IDENTIFIER,
           MqttConnectedSystemTemplate.USERNAME,
           MqttConnectedSystemTemplate.PASSWORD,

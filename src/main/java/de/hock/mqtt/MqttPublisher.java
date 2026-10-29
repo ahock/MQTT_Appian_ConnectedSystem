@@ -1,5 +1,6 @@
 package de.hock.mqtt;
 
+import java.security.GeneralSecurityException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -24,9 +25,13 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
  * token plumbing, and {@link MemoryPersistence} is used because Paho's default persistence writes
  * to the filesystem, which Appian's plug-in policies forbid.
  *
- * <p>Transport is plain {@code tcp://} only. This build contains no TLS: no {@code ssl://} scheme,
- * no {@code SSLContext}, no socket factory, and — as the policies require — no
- * {@code System.setProperty} call anywhere.
+ * <p><strong>Transport.</strong> Plain {@code tcp://} when TLS is off, which is the default and the
+ * unchanged 1.0.6 behaviour, and {@code ssl://} when the connected system enables it. TLS is
+ * server-side only: {@link TlsSupport} builds an in-memory {@code SSLContext} whose socket factory
+ * is installed on the options below, and the plug-in still makes no
+ * {@code System.setProperty} call anywhere and still writes nothing to the filesystem — the two
+ * Appian policies that rule out the usual MQTT-over-TLS shortcuts. The configured port is never
+ * rewritten by the TLS flag.
  */
 public final class MqttPublisher {
 
@@ -66,6 +71,10 @@ public final class MqttPublisher {
    *
    * @param brokerHost broker host name or address
    * @param brokerPort broker TCP port
+   * @param tlsEnabled TLS flag from the connected system; {@code null} or {@code false} means plain
+   *     {@code tcp://}
+   * @param caCertificatePem PEM-encoded broker CA certificate, or {@code null}/blank for the JVM
+   *     default trust store; ignored entirely when TLS is off
    * @param clientIdentifier MQTT client identifier; a blank value falls back to Paho's own
    *     {@link MqttClient#generateClientId()}
    * @param username broker user name, or {@code null}/blank for an anonymous connection
@@ -80,10 +89,14 @@ public final class MqttPublisher {
    * @param cleanSession clean-session flag; {@code null} means {@code true}
    * @param autoReconnectEnabled automatic-reconnect flag; {@code null} means {@code false}
    * @throws MqttException if the connection or the publish fails
+   * @throws GeneralSecurityException if TLS is enabled and the configured CA certificate cannot be
+   *     turned into a trust anchor
    */
   public static void publish(
       String brokerHost,
       int brokerPort,
+      Boolean tlsEnabled,
+      String caCertificatePem,
       String clientIdentifier,
       String username,
       char[] password,
@@ -94,7 +107,7 @@ public final class MqttPublisher {
       Integer keepAliveSeconds,
       Boolean cleanSession,
       Boolean autoReconnectEnabled)
-      throws MqttException {
+      throws MqttException, GeneralSecurityException {
 
     String clientId =
         (clientIdentifier == null || clientIdentifier.isBlank())
@@ -103,6 +116,8 @@ public final class MqttPublisher {
 
     MqttConnectOptions options =
         buildConnectOptions(
+            tlsEnabled,
+            caCertificatePem,
             username,
             password,
             connectionTimeoutSeconds,
@@ -111,7 +126,10 @@ public final class MqttPublisher {
             autoReconnectEnabled);
 
     MqttClient client =
-        new MqttClient("tcp://" + brokerHost + ":" + brokerPort, clientId, new MemoryPersistence());
+        new MqttClient(
+            TlsSupport.brokerUri(tlsEnabled, brokerHost, brokerPort),
+            clientId,
+            new MemoryPersistence());
     client.setTimeToWait(TIME_TO_WAIT_MILLIS);
     try {
       client.connect(options);
@@ -137,21 +155,42 @@ public final class MqttPublisher {
    *
    * <p>Separated out so the mapping from configuration to Paho is observable without a broker, and
    * shared with {@link MqttSubscriber} so neither call site duplicates the default-from-{@code null}
-   * logic: every setter used here has a matching getter on {@link MqttConnectOptions}. The method is
-   * total — it never throws. A {@code null} value means "not configured" and takes the documented
-   * default; a supplied value outside its bounds also falls back to the default rather than throwing
-   * here.
+   * logic: every setter used here has a matching getter on {@link MqttConnectOptions}. A
+   * {@code null} value means "not configured" and takes the documented default; a supplied value
+   * outside its bounds also falls back to the default rather than throwing here.
+   *
+   * <p><strong>TLS is applied here, and only here.</strong> That is the load-bearing choice of the
+   * 1.0.7 change: both call sites already build their options through this method and have no other
+   * way to do it, so neither can forget TLS, and the socket factory is installed in exactly one
+   * place. The session-setting fallbacks above still never throw, but as of 1.0.7 the method is no
+   * longer total: malformed certificate material raises
+   * {@link java.security.GeneralSecurityException}. On the integration path that is unreachable,
+   * because {@link ConnectionConfigValidator#firstError} rejects an unparseable CA certificate
+   * first.
+   *
+   * <p>Two TLS details worth stating rather than leaving to be rediscovered. The socket factory is
+   * installed <em>only</em> when TLS is on, so a CA certificate left behind in a saved configuration
+   * cannot quietly pull TLS into a plain connection — the validator reports that combination instead.
+   * And {@code setHttpsHostnameVerificationEnabled(true)} is set unconditionally: it is inert when
+   * TLS is off, since only Paho's {@code ssl} and {@code wss} module factories read it, and setting
+   * it explicitly means the plug-in does not depend on a Paho default it cannot see. The matching
+   * SSL hostname verifier is deliberately left {@code null}: Paho runs that custom verifier
+   * <em>only</em> when this flag is false, so setting both would be contradictory.
    *
    * <p>Since 1.0.6 those out-of-range fallbacks are unreachable on the integration path:
    * {@link ConnectionConfigValidator#firstError} rejects an out-of-range
    * {@code connectionTimeoutSeconds} or {@code keepAliveSeconds} before either integration reaches
-   * this method. They are kept as defence in depth, so this method stays a total function for any
-   * caller.
+   * this method. They are kept as defence in depth.
    *
    * <p>Effective defaults: connect timeout {@value #CONNECT_TIMEOUT_SECONDS} seconds; keep-alive
    * Paho's own {@link MqttConnectOptions#KEEP_ALIVE_INTERVAL_DEFAULT} seconds, left in place by not
-   * calling the setter at all; clean session {@code true}; automatic reconnect {@code false}.
+   * calling the setter at all; clean session {@code true}; automatic reconnect {@code false}; TLS
+   * off.
    *
+   * @param tlsEnabled TLS flag from the connected system; {@code null} or {@code false} installs no
+   *     socket factory at all
+   * @param caCertificatePem PEM-encoded broker CA certificate, or {@code null}/blank for the JVM
+   *     default trust store; read only when {@code tlsEnabled} is {@code true}
    * @param username broker user name, or {@code null}/blank for an anonymous connection
    * @param password broker password; applied only alongside a non-blank username
    * @param connectionTimeoutSeconds connect timeout in seconds, 1–300, or {@code null}
@@ -164,16 +203,28 @@ public final class MqttPublisher {
    *     request — the {@code finally} block in {@link #publish} disconnects and closes the client
    *     either way.
    * @return the connect options to hand to Paho
+   * @throws GeneralSecurityException if TLS is enabled and the configured CA certificate cannot be
+   *     turned into a trust anchor
    */
   static MqttConnectOptions buildConnectOptions(
+      Boolean tlsEnabled,
+      String caCertificatePem,
       String username,
       char[] password,
       Integer connectionTimeoutSeconds,
       Integer keepAliveSeconds,
       Boolean cleanSession,
-      Boolean autoReconnectEnabled) {
+      Boolean autoReconnectEnabled)
+      throws GeneralSecurityException {
 
     MqttConnectOptions options = new MqttConnectOptions();
+
+    // Inert unless the URI scheme is ssl:// or wss://, so this is safe to set unconditionally — and
+    // setting it explicitly is better than inheriting a library default that cannot be seen here.
+    options.setHttpsHostnameVerificationEnabled(true);
+    if (TlsSupport.isTlsEnabled(tlsEnabled)) {
+      options.setSocketFactory(TlsSupport.socketFactory(caCertificatePem));
+    }
 
     options.setConnectionTimeout(
         inRange(connectionTimeoutSeconds, CONNECT_TIMEOUT_MIN_SECONDS, CONNECT_TIMEOUT_MAX_SECONDS)
